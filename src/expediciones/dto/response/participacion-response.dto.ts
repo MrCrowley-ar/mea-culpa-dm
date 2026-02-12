@@ -7,6 +7,8 @@ export class ParticipacionResponseDto {
   usuario_nombre: string | null;
   nombre_personaje: string;
   oro_acumulado: number;
+  activo: boolean;
+  sala_salida: number | null;
   created_at: Date;
 
   static fromEntity(entity: Participacion): ParticipacionResponseDto {
@@ -17,6 +19,8 @@ export class ParticipacionResponseDto {
     dto.usuario_nombre = entity.usuario?.nombre ?? null;
     dto.nombre_personaje = entity.nombre_personaje;
     dto.oro_acumulado = entity.oro_acumulado;
+    dto.activo = entity.activo;
+    dto.sala_salida = entity.sala_salida ?? null;
     dto.created_at = entity.created_at;
     return dto;
   }

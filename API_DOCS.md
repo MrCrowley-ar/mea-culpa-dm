@@ -94,9 +94,9 @@ POST /api/auth/refresh
 
 ---
 
-## 2. Flujo Completo de una Expedición
+## 2. Flujo Completo de una Expedición (Integrado)
 
-Este es el orden en que un DM usaría la API para ejecutar una sesión de juego completa:
+Este es el flujo recomendado usando los endpoints integrados que automatizan la gestión de salas, participantes activos, y recompensas.
 
 ### Paso 1: Crear la expedición
 
@@ -108,21 +108,6 @@ POST /api/expediciones
 {
   "fecha": "2026-02-15",
   "notas": "Expedición al piso 3"
-}
-```
-
-**Response 201:**
-```json
-{
-  "id": 1,
-  "organizador_id": "123456789012345678",
-  "organizador_nombre": "Juan Perez",
-  "fecha": "2026-02-15T00:00:00.000Z",
-  "estado": "pendiente",
-  "piso_actual": 1,
-  "notas": "Expedición al piso 3",
-  "created_at": "2026-02-12T15:00:00.000Z",
-  "updated_at": "2026-02-12T15:00:00.000Z"
 }
 ```
 
@@ -159,35 +144,69 @@ Repetir para cada jugador:
   "usuario_nombre": "Player1",
   "nombre_personaje": "Aldric el Guerrero",
   "oro_acumulado": 0,
+  "activo": true,
+  "sala_salida": null,
   "created_at": "2026-02-12T15:01:00.000Z"
 }
 ```
 
-### Paso 3: Elegir piso y arrancar la expedición
+### Paso 3: Arrancar la expedición
 
 ```
 PUT /api/expediciones/1
 ```
 
 ```json
-{
-  "estado": "en_curso",
-  "piso_actual": 3
-}
+{ "estado": "en_curso" }
 ```
 
-### Paso 4: Entrar a una habitación - Resolver encuentro de enemigos
+### Paso 4: Generar layout del piso
 
-El DM tira 1d20 y usa el resultado para consultar qué enemigos aparecen:
+El sistema genera automáticamente las salas: N comunes + bonus (opcional) + evento (opcional) + jefe (siempre).
 
 ```
-POST /api/gameplay/resolver-encuentro
+POST /api/gameplay/generar-layout-piso
 ```
 
 ```json
 {
+  "expedicion_id": 1,
   "piso": 3,
-  "tipo_habitacion_id": 1,
+  "incluir_bonus": true,
+  "incluir_evento": false
+}
+```
+
+**Response 200:**
+```json
+{
+  "expedicion_id": 1,
+  "piso": 3,
+  "total_habitaciones": 5,
+  "habitaciones": [
+    { "id": 1, "orden": 1, "tipo_habitacion_id": 1, "tipo_nombre": "comun", "completada": false },
+    { "id": 2, "orden": 2, "tipo_habitacion_id": 1, "tipo_nombre": "comun", "completada": false },
+    { "id": 3, "orden": 3, "tipo_habitacion_id": 1, "tipo_nombre": "comun", "completada": false },
+    { "id": 4, "orden": 4, "tipo_habitacion_id": 2, "tipo_nombre": "bonus", "completada": false },
+    { "id": 5, "orden": 5, "tipo_habitacion_id": 3, "tipo_nombre": "jefe", "completada": false }
+  ]
+}
+```
+
+> El piso 3 tiene `num_habitaciones_comunes = 3`. Se generan 3 comunes + 1 bonus + 1 jefe = 5 salas.
+> `piso_actual` se actualiza automáticamente.
+
+### Paso 5: POR CADA SALA - Resolver encuentro
+
+El DM tira 1d20 para determinar qué enemigos aparecen en la sala:
+
+```
+POST /api/gameplay/resolver-encuentro-habitacion
+```
+
+```json
+{
+  "historial_habitacion_id": 1,
   "tirada": 14
 }
 ```
@@ -206,215 +225,146 @@ POST /api/gameplay/resolver-encuentro
 }
 ```
 
-> El DM sabe que puede colocar hasta 4 enemigos totales: máximo 2 Esqueletos y máximo 2 Zombies.
+> Persiste automáticamente `tirada_encuentro` y `enemigos_derrotados` en el historial de la habitación.
 
-### Paso 5: Registrar la habitación en el historial
+### Paso 6: POR CADA SALA - Procesar recompensas (preview)
 
-```
-POST /api/historial/habitaciones
-```
-
-```json
-{
-  "expedicion_id": 1,
-  "piso_numero": 3,
-  "tipo_habitacion_id": 1,
-  "orden": 1,
-  "tirada_encuentro": 14,
-  "enemigos_derrotados": 4,
-  "completada": true,
-  "notas": "2 Esqueletos + 2 Zombies derrotados"
-}
-```
-
-**Response 201:**
-```json
-{
-  "id": 1,
-  "expedicion_id": 1,
-  "piso_numero": 3,
-  "tipo_habitacion_id": 1,
-  "tipo_habitacion_nombre": "comun",
-  "orden": 1,
-  "tirada_encuentro": 14,
-  "enemigos_derrotados": 4,
-  "completada": true,
-  "notas": "2 Esqueletos + 2 Zombies derrotados",
-  "created_at": "2026-02-12T15:10:00.000Z",
-  "recompensas": []
-}
-```
-
-### Paso 6: Dar recompensas a cada participante
-
-El DM tira 1d20 para cada jugador. Ejemplo para Aldric (tirada = 14):
+El DM tira 1d20 por cada enemigo derrotado. El sistema resuelve cada tirada contra las tablas de recompensas:
 
 ```
-POST /api/gameplay/resolver-recompensa
+POST /api/gameplay/procesar-recompensas-habitacion
 ```
 
 ```json
 {
-  "piso": 3,
-  "tipo_habitacion_id": 1,
-  "tirada_d20": 14
-}
-```
-
-**Response 200 (ejemplo: resultado "oro"):**
-```json
-{
-  "piso": 3,
-  "tipo_habitacion_id": 1,
-  "tirada_original": 14,
-  "bonus_recompensa": 4,
-  "tirada_con_bonus": 18,
-  "tipo_resultado": "oro",
-  "dados_oro": "2d6",
-  "descripcion": "Bolsa de monedas",
-  "requiere_subtabla": false
-}
-```
-
-> El piso 3 tiene bonus +4, así que 14 + 4 = 18. Esa tirada cayó en el rango de "oro". El DM tira 2d6 para determinar cuánto oro.
-
-**Response 200 (ejemplo: resultado "nada", tirada baja):**
-```json
-{
-  "piso": 3,
-  "tipo_habitacion_id": 1,
-  "tirada_original": 2,
-  "bonus_recompensa": 4,
-  "tirada_con_bonus": 6,
-  "tipo_resultado": "nada",
-  "descripcion": "No hay recompensa",
-  "requiere_subtabla": false
-}
-```
-
-**Response 200 (ejemplo: resultado "subtabla" - requiere segunda tirada):**
-```json
-{
-  "piso": 3,
-  "tipo_habitacion_id": 1,
-  "tirada_original": 16,
-  "bonus_recompensa": 4,
-  "tirada_con_bonus": 20,
-  "tipo_resultado": "subtabla",
-  "subtabla_nombre": "armas",
-  "descripcion": "Arma encontrada",
-  "requiere_subtabla": true
-}
-```
-
-> La API indica que toca ir a la tabla de armas. El DM tira otro d20 y vuelve a llamar con `tirada_subtabla`:
-
-### Paso 7: Resolver subtabla (segunda tirada)
-
-```
-POST /api/gameplay/resolver-recompensa
-```
-
-```json
-{
-  "piso": 3,
-  "tipo_habitacion_id": 1,
-  "tirada_d20": 16,
-  "tirada_subtabla": 7
+  "historial_habitacion_id": 1,
+  "tiradas": [
+    { "tirada_d20": 14, "tirada_subtabla": 7 },
+    { "tirada_d20": 8 },
+    { "tirada_d20": 18, "tirada_subtabla": 3 },
+    { "tirada_d20": 2 }
+  ]
 }
 ```
 
 **Response 200:**
 ```json
 {
+  "historial_habitacion_id": 1,
   "piso": 3,
   "tipo_habitacion_id": 1,
-  "tirada_original": 16,
-  "bonus_recompensa": 4,
-  "tirada_con_bonus": 20,
-  "tipo_resultado": "subtabla",
-  "subtabla_nombre": "armas",
-  "tirada_subtabla": 7,
-  "requiere_subtabla": false,
-  "item_nombre": "Espada larga",
-  "item_id": 5,
-  "modificador_tier": 0,
-  "descripcion": "Arma encontrada"
+  "resultados": [
+    {
+      "tirada_original": 14,
+      "bonus_recompensa": 4,
+      "tirada_con_bonus": 18,
+      "tipo_resultado": "subtabla",
+      "subtabla_nombre": "armas",
+      "tirada_subtabla": 7,
+      "requiere_subtabla": false,
+      "item_nombre": "Espada larga",
+      "item_id": 5,
+      "modificador_tier": 0
+    },
+    {
+      "tirada_original": 8,
+      "bonus_recompensa": 4,
+      "tirada_con_bonus": 12,
+      "tipo_resultado": "oro",
+      "dados_oro": "2d6",
+      "requiere_subtabla": false
+    },
+    {
+      "tirada_original": 18,
+      "bonus_recompensa": 4,
+      "tirada_con_bonus": 22,
+      "tipo_resultado": "subtabla",
+      "subtabla_nombre": "armaduras",
+      "tirada_subtabla": 3,
+      "requiere_subtabla": false,
+      "item_nombre": "Escudo de roble",
+      "item_id": 10,
+      "modificador_tier": 0
+    },
+    {
+      "tirada_original": 2,
+      "bonus_recompensa": 4,
+      "tirada_con_bonus": 6,
+      "tipo_resultado": "nada",
+      "requiere_subtabla": false
+    }
+  ],
+  "items_pendientes": [
+    {
+      "indice": 0,
+      "tirada_d20": 14,
+      "tirada_subtabla": 7,
+      "subtabla_nombre": "armas",
+      "item_id": 5,
+      "item_nombre": "Espada larga",
+      "modificador_tier": 0
+    },
+    {
+      "indice": 2,
+      "tirada_d20": 18,
+      "tirada_subtabla": 3,
+      "subtabla_nombre": "armaduras",
+      "item_id": 10,
+      "item_nombre": "Escudo de roble",
+      "modificador_tier": 0
+    }
+  ],
+  "oro_dados": ["2d6"]
 }
 ```
 
-> Piso 3 es Tier 1 → mod_armas = +0. Si fuera piso 8 (Tier 2), sería "Espada larga +1".
+> **Importante:** Este endpoint es un PREVIEW. No persiste nada. Los items se asignan con `asignar-item` y el oro con `repartir-oro-habitacion`.
+> `items_pendientes` lista los items que el DM debe asignar manualmente a un jugador.
+> `oro_dados` lista los dados que el DM debe tirar para obtener el oro total a repartir.
 
-**Ejemplo en Tier 3 (piso 12, mod_armas = +2):**
-```json
-{
-  "piso": 12,
-  "tipo_habitacion_id": 1,
-  "tirada_original": 16,
-  "bonus_recompensa": 2,
-  "tirada_con_bonus": 18,
-  "tipo_resultado": "subtabla",
-  "subtabla_nombre": "armas",
-  "tirada_subtabla": 7,
-  "requiere_subtabla": false,
-  "item_nombre": "Espada larga",
-  "item_id": 5,
-  "modificador_tier": 2,
-  "item_con_modificador": "Espada larga +2"
-}
-```
+### Paso 7: POR CADA SALA - Asignar items a jugadores (manual)
 
-### Paso 8: Guardar la recompensa en el historial
+El DM decide qué jugador se queda con cada item:
 
 ```
-POST /api/historial/recompensas
+POST /api/gameplay/asignar-item
 ```
 
 ```json
 {
   "historial_habitacion_id": 1,
   "participacion_id": 1,
-  "tirada_original": 16,
+  "tirada_original": 14,
   "tirada_subtabla": 7,
   "item_id": 5,
-  "modificador_tier": 0,
-  "oro_obtenido": 0,
-  "vendido": false
+  "modificador_tier": 0
 }
 ```
 
-**Response 201:**
+**Response 200:**
 ```json
 {
   "id": 1,
   "historial_habitacion_id": 1,
   "participacion_id": 1,
-  "participacion_personaje": "Aldric el Guerrero",
-  "tirada_original": 16,
-  "tirada_subtabla": 7,
-  "item_id": 5,
-  "item_nombre": "Espada larga",
-  "modificador_tier": 0,
-  "oro_obtenido": 0,
-  "vendido": false,
-  "precio_venta": null,
-  "created_at": "2026-02-12T15:12:00.000Z"
+  "item_id": 5
 }
 ```
 
-### Paso 6b: Si la recompensa es oro bruto, repartir entre N jugadores
+> Repetir por cada item de `items_pendientes`.
 
-Cuando la recompensa es "oro" el DM tira los dados (ej: 2d6 = 9 de oro) y decide entre cuántos jugadores se reparte. No se asigna a uno solo, se divide:
+### Paso 8: POR CADA SALA - Repartir oro entre activos (automático)
+
+El DM tira los dados de oro (ej: 2d6 = 9) y el sistema reparte automáticamente entre los participantes activos:
 
 ```
-POST /api/gameplay/repartir-oro
+POST /api/gameplay/repartir-oro-habitacion
 ```
 
 ```json
 {
   "historial_habitacion_id": 1,
-  "oro_total": 9,
-  "participacion_ids": [1, 2, 3, 4, 5]
+  "oro_total": 9
 }
 ```
 
@@ -422,101 +372,94 @@ POST /api/gameplay/repartir-oro
 ```json
 {
   "repartos": [
-    { "participacion_id": 1, "oro": 2 },
-    { "participacion_id": 2, "oro": 2 },
-    { "participacion_id": 3, "oro": 2 },
-    { "participacion_id": 4, "oro": 2 },
-    { "participacion_id": 5, "oro": 1 }
+    { "participacion_id": 1, "nombre_personaje": "Aldric el Guerrero", "oro": 2 },
+    { "participacion_id": 2, "nombre_personaje": "Lyra la Maga", "oro": 2 },
+    { "participacion_id": 3, "nombre_personaje": "Theron el Pícaro", "oro": 2 },
+    { "participacion_id": 4, "nombre_personaje": "Sera la Clériga", "oro": 2 },
+    { "participacion_id": 5, "nombre_personaje": "Kael el Ranger", "oro": 1 }
   ]
 }
 ```
 
-> 9 / 5 = 1 c/u + 4 de sobrante → los primeros 4 reciben 2, el último 1.
-> Si solo quiere repartir entre 3 jugadores de esa sala: pasa solo 3 IDs.
-> Crea automáticamente los registros en historial_recompensas con `oro_obtenido` por cada participante.
+> Obtiene automáticamente los participantes ACTIVOS de la expedición.
+> El sobrante se reparte 1 extra a los primeros.
 
-### Paso 9: Ver resumen antes de repartir
+### Paso 9: POR CADA SALA - Completar la sala
 
-Al final de la expedición (o en cualquier momento), el DM puede ver un resumen de todo lo obtenido por cada personaje:
+```
+POST /api/gameplay/completar-habitacion/1
+```
+
+**Response 200:**
+```json
+{ "id": 1, "completada": true }
+```
+
+### Paso 9b: Si un jugador se va de la expedición
+
+```
+PUT /api/expediciones/participaciones/3/desactivar
+```
+
+```json
+{ "sala_salida": 2 }
+```
+
+**Response 200:**
+```json
+{ "participacion_id": 3, "activo": false, "sala_salida": 2 }
+```
+
+> A partir de la siguiente sala, Theron ya no recibe oro ni participa en el reparto.
+> Si el DM se equivocó, puede reactivar:
+
+```
+PUT /api/expediciones/participaciones/3/reactivar
+```
+
+**Response 200:**
+```json
+{ "participacion_id": 3, "activo": true }
+```
+
+### Paso 9c: Si entra un reemplazante
+
+```
+POST /api/expediciones/1/participaciones
+```
+
+```json
+{ "usuario_id": "666666666666666666", "nombre_personaje": "Vex el Brujo" }
+```
+
+> El nuevo jugador entra como activo por defecto y empieza a recibir oro desde la próxima sala.
+
+### Paso 10: Ver participantes activos
+
+```
+GET /api/gameplay/participantes-activos/1
+```
+
+**Response 200:**
+```json
+[
+  { "id": 1, "nombre_personaje": "Aldric el Guerrero", "activo": true, "sala_salida": null, "oro_acumulado": 4 },
+  { "id": 2, "nombre_personaje": "Lyra la Maga", "activo": true, "sala_salida": null, "oro_acumulado": 4 },
+  { "id": 4, "nombre_personaje": "Sera la Clériga", "activo": true, "sala_salida": null, "oro_acumulado": 4 },
+  { "id": 5, "nombre_personaje": "Kael el Ranger", "activo": true, "sala_salida": null, "oro_acumulado": 3 },
+  { "id": 6, "nombre_personaje": "Vex el Brujo", "activo": true, "sala_salida": null, "oro_acumulado": 0 }
+]
+```
+
+### Paso 11: Ver resumen completo
 
 ```
 GET /api/gameplay/resumen-expedicion/1
 ```
 
-**Response 200:**
-```json
-{
-  "expedicion_id": 1,
-  "estado": "en_curso",
-  "piso_actual": 3,
-  "total_habitaciones": 3,
-  "participantes": [
-    {
-      "participacion_id": 1,
-      "nombre_personaje": "Aldric el Guerrero",
-      "usuario_id": "111111111111111111",
-      "items": [
-        {
-          "recompensa_id": 1,
-          "habitacion_orden": 1,
-          "tirada_original": 16,
-          "tirada_subtabla": 7,
-          "item_id": 5,
-          "item_nombre": "Espada larga",
-          "modificador_tier": 0,
-          "oro_obtenido": 0,
-          "vendido": false,
-          "precio_venta": null
-        },
-        {
-          "recompensa_id": 5,
-          "habitacion_orden": 2,
-          "tirada_original": 0,
-          "tirada_subtabla": null,
-          "item_id": null,
-          "item_nombre": null,
-          "modificador_tier": null,
-          "oro_obtenido": 2,
-          "vendido": false,
-          "precio_venta": null
-        }
-      ],
-      "total_oro_bruto": 2,
-      "total_oro_ventas": 0,
-      "total_oro": 2,
-      "oro_acumulado_actual": 0
-    },
-    {
-      "participacion_id": 2,
-      "nombre_personaje": "Lyra la Maga",
-      "usuario_id": "222222222222222222",
-      "items": [
-        {
-          "recompensa_id": 3,
-          "habitacion_orden": 1,
-          "tirada_original": 18,
-          "tirada_subtabla": 3,
-          "item_id": 10,
-          "item_nombre": "Escudo de roble",
-          "modificador_tier": 0,
-          "oro_obtenido": 0,
-          "vendido": false,
-          "precio_venta": null
-        }
-      ],
-      "total_oro_bruto": 0,
-      "total_oro_ventas": 0,
-      "total_oro": 0,
-      "oro_acumulado_actual": 0
-    }
-  ],
-  "oro_total_expedicion": 2
-}
-```
+> Muestra todos los items y oro por cada personaje (incluyendo inactivos).
 
-### Paso 10: Liquidar recompensas (decidir ventas y calcular oro final)
-
-El DM revisa el resumen y decide qué items se venden. Envía todas las decisiones de una:
+### Paso 12: Liquidar recompensas
 
 ```
 POST /api/gameplay/liquidar-recompensas
@@ -532,70 +475,16 @@ POST /api/gameplay/liquidar-recompensas
 }
 ```
 
-**Response 200:**
-```json
-{
-  "expedicion_id": 1,
-  "decisiones_aplicadas": 2,
-  "participantes": [
-    {
-      "participacion_id": 1,
-      "nombre_personaje": "Aldric el Guerrero",
-      "oro_bruto": 2,
-      "oro_ventas": 0,
-      "oro_total": 2
-    },
-    {
-      "participacion_id": 2,
-      "nombre_personaje": "Lyra la Maga",
-      "oro_bruto": 0,
-      "oro_ventas": 25,
-      "oro_total": 25
-    }
-  ],
-  "oro_total_expedicion": 27
-}
-```
+> Calcula oro final = oro bruto + ventas. Actualiza `oro_acumulado` automáticamente.
 
-> Este endpoint:
-> 1. Aplica las decisiones de venta a cada recompensa
-> 2. Calcula el oro total por participante = oro_bruto + oro_ventas
-> 3. Actualiza `participacion.oro_acumulado` automáticamente
->
-> El DM puede llamar este endpoint varias veces si necesita ajustar decisiones.
-
-### Paso 11: Actualizar oro manual (opcional)
-
-Si necesita ajustar oro manualmente:
-
-```
-PUT /api/expediciones/participaciones/1/oro
-```
-
-```json
-{
-  "oro": 50
-}
-```
-
-**Response 200:**
-```json
-{
-  "participacion_id": 1,
-  "oro_acumulado": 50
-}
-```
-
-### Paso 12: Completar la expedición
+### Paso 13: Completar la expedición
 
 ```
 PUT /api/expediciones/1
 ```
 
 ```json
-{
-  "estado": "completada"
-}
+{ "estado": "completada" }
 ```
 
 ---
@@ -762,10 +651,12 @@ DELETE /api/expediciones/:id        → Eliminar
 ### Participaciones
 
 ```
-GET    /api/expediciones/:id/participaciones                        → Listar participantes
-POST   /api/expediciones/:id/participaciones                        → Agregar participante
-DELETE /api/expediciones/participaciones/:participacionId            → Quitar participante
-PUT    /api/expediciones/participaciones/:participacionId/oro       → Actualizar oro
+GET    /api/expediciones/:id/participaciones                               → Listar participantes
+POST   /api/expediciones/:id/participaciones                               → Agregar participante
+DELETE /api/expediciones/participaciones/:participacionId                   → Quitar participante
+PUT    /api/expediciones/participaciones/:participacionId/oro              → Actualizar oro
+PUT    /api/expediciones/participaciones/:participacionId/desactivar      → Jugador se va
+PUT    /api/expediciones/participaciones/:participacionId/reactivar       → Revertir salida
 ```
 
 **Agregar:**
@@ -780,6 +671,14 @@ PUT    /api/expediciones/participaciones/:participacionId/oro       → Actualiz
 ```json
 { "oro": 50 }
 ```
+
+**Desactivar (jugador se va):**
+```json
+{ "sala_salida": 3 }
+```
+
+**Reactivar (DM se equivocó):**
+No requiere body.
 
 ---
 
@@ -1020,6 +919,132 @@ DELETE /api/recompensas/critico/:id   → Eliminar
 ---
 
 ## 8. Gameplay (Endpoints Inteligentes)
+
+### Flujo Integrado por Sala
+
+Estos son los endpoints principales para ejecutar una expedición sala por sala:
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST | `/gameplay/generar-layout-piso` | Genera las salas de un piso |
+| POST | `/gameplay/resolver-encuentro-habitacion` | Resuelve enemigos de una sala |
+| POST | `/gameplay/procesar-recompensas-habitacion` | Preview de recompensas (1d20 por enemigo) |
+| POST | `/gameplay/asignar-item` | Asigna un item a un jugador específico |
+| POST | `/gameplay/repartir-oro-habitacion` | Reparte oro entre activos automáticamente |
+| POST | `/gameplay/completar-habitacion/:id` | Marca sala como completada |
+| GET | `/gameplay/participantes-activos/:expedicionId` | Lista participantes activos |
+
+> Ver [Flujo Completo](#2-flujo-completo-de-una-expedición-integrado) para ejemplos detallados de cada endpoint.
+
+### Generar Layout de Piso
+
+```
+POST /api/gameplay/generar-layout-piso
+```
+
+```json
+{
+  "expedicion_id": 1,
+  "piso": 3,
+  "incluir_bonus": true,
+  "incluir_evento": false
+}
+```
+
+> Genera automáticamente N comunes (según `num_habitaciones_comunes` del piso) + bonus (opcional) + evento (opcional) + jefe (siempre).
+> Actualiza `piso_actual` de la expedición. No se puede volver a generar un piso que ya fue generado.
+
+### Resolver Encuentro de Habitación
+
+```
+POST /api/gameplay/resolver-encuentro-habitacion
+```
+
+```json
+{
+  "historial_habitacion_id": 1,
+  "tirada": 14
+}
+```
+
+> Lee automáticamente el piso y tipo de habitación del registro. Persiste la tirada y cantidad de enemigos.
+
+### Procesar Recompensas de Habitación (Preview)
+
+```
+POST /api/gameplay/procesar-recompensas-habitacion
+```
+
+```json
+{
+  "historial_habitacion_id": 1,
+  "tiradas": [
+    { "tirada_d20": 14, "tirada_subtabla": 7 },
+    { "tirada_d20": 8 },
+    { "tirada_d20": 2 }
+  ]
+}
+```
+
+> **No persiste nada.** Es un preview para que el DM vea los resultados y decida.
+> Retorna `items_pendientes` (para asignar con `asignar-item`) y `oro_dados` (dados a tirar para oro).
+
+### Asignar Item
+
+```
+POST /api/gameplay/asignar-item
+```
+
+```json
+{
+  "historial_habitacion_id": 1,
+  "participacion_id": 1,
+  "tirada_original": 14,
+  "tirada_subtabla": 7,
+  "item_id": 5,
+  "modificador_tier": 0
+}
+```
+
+> Crea un registro `historial_recompensa` vinculando el item al participante.
+
+### Repartir Oro por Habitación
+
+```
+POST /api/gameplay/repartir-oro-habitacion
+```
+
+```json
+{
+  "historial_habitacion_id": 1,
+  "oro_total": 9
+}
+```
+
+> Obtiene automáticamente los participantes ACTIVOS y reparte equitativamente.
+> No necesita pasar IDs de participantes — los busca de la expedición.
+
+### Completar Habitación
+
+```
+POST /api/gameplay/completar-habitacion/1
+```
+
+> Marca la sala como completada. No se pueden resolver más encuentros ni recompensas en ella.
+
+### Participantes Activos
+
+```
+GET /api/gameplay/participantes-activos/1
+```
+
+> Retorna solo los participantes con `activo = true`.
+
+---
+
+### Endpoints Originales (bajo nivel)
+
+Estos endpoints siguen disponibles para uso directo sin el flujo integrado:
 
 ### Resolver Encuentro
 

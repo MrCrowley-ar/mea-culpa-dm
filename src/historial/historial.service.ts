@@ -97,4 +97,25 @@ export class HistorialService {
     await this.getHistorialRecompensa(id);
     await this.histRecompensaRepo.delete(id);
   }
+
+  async getHabitacionesByExpedicionAndPiso(
+    expedicionId: number,
+    pisoNumero: number,
+  ): Promise<HistorialHabitacion[]> {
+    return this.histHabitacionRepo.findByExpedicionAndPiso(expedicionId, pisoNumero);
+  }
+
+  async getMaxOrden(expedicionId: number): Promise<number> {
+    return this.histHabitacionRepo.getMaxOrden(expedicionId);
+  }
+
+  async registrarHabitacionesBatch(
+    data: Partial<HistorialHabitacion>[],
+  ): Promise<HistorialHabitacion[]> {
+    const results: HistorialHabitacion[] = [];
+    for (const item of data) {
+      results.push(await this.histHabitacionRepo.create(item));
+    }
+    return results;
+  }
 }

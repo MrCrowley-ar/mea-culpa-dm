@@ -18,6 +18,7 @@ import { RolUsuario } from '../common/enums';
 import { CreateExpedicionDto } from './dto/request/create-expedicion.dto';
 import { UpdateExpedicionDto } from './dto/request/update-expedicion.dto';
 import { CreateParticipacionDto } from './dto/request/create-participacion.dto';
+import { DesactivarParticipacionDto } from './dto/request/desactivar-participacion.dto';
 import { ExpedicionResponseDto } from './dto/response/expedicion-response.dto';
 import { ParticipacionResponseDto } from './dto/response/participacion-response.dto';
 
@@ -106,5 +107,22 @@ export class ExpedicionesController {
   ): Promise<{ participacion_id: number; oro_acumulado: number }> {
     await this.expedicionesService.updateOro(participacionId, body.oro);
     return { participacion_id: participacionId, oro_acumulado: body.oro };
+  }
+
+  @Put('participaciones/:participacionId/desactivar')
+  async desactivarParticipacion(
+    @Param('participacionId', ParseIntPipe) participacionId: number,
+    @Body() dto: DesactivarParticipacionDto,
+  ): Promise<{ participacion_id: number; activo: boolean; sala_salida: number }> {
+    await this.expedicionesService.desactivarParticipacion(participacionId, dto.sala_salida);
+    return { participacion_id: participacionId, activo: false, sala_salida: dto.sala_salida };
+  }
+
+  @Put('participaciones/:participacionId/reactivar')
+  async reactivarParticipacion(
+    @Param('participacionId', ParseIntPipe) participacionId: number,
+  ): Promise<{ participacion_id: number; activo: boolean }> {
+    await this.expedicionesService.reactivarParticipacion(participacionId);
+    return { participacion_id: participacionId, activo: true };
   }
 }

@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import {
+  ConflictServiceException,
   NotFoundServiceException,
   ValidationServiceException,
 } from '../common/exceptions/service.exception';
-import { TipoResultadoRecompensa } from '../common/enums';
+import { EstadoExpedicion, TipoResultadoRecompensa } from '../common/enums';
 import { ConfiguracionService } from '../configuracion/configuracion.service';
 import { EncuentrosService } from '../encuentros/encuentros.service';
 import { RecompensasService } from '../recompensas/recompensas.service';
@@ -13,6 +14,13 @@ import {
   EncuentroResueltoDto,
 } from './dto/response/encuentro-resuelto.dto';
 import { RecompensaResueltaDto } from './dto/response/recompensa-resuelta.dto';
+import {
+  LayoutPisoResponseDto,
+} from './dto/response/layout-piso-response.dto';
+import {
+  ResultadoRecompensasHabitacionDto,
+  ItemPendienteDto,
+} from './dto/response/resultado-recompensas-habitacion.dto';
 import {
   ResumenExpedicionDto,
   ParticipanteResumenDto,
@@ -336,6 +344,281 @@ export class GameplayService {
       item_id: entrada.item_id,
       descripcion,
     });
+  }
+
+  // =========================================================================
+  // FLUJO INTEGRADO POR SALA
+  // =========================================================================
+
+  /**
+   * Genera el layout de salas para un piso de una expedición.
+   * Crea: N comunes + (bonus opcional) + (evento opcional) + 1 jefe (siempre).
+   * Actualiza piso_actual de la expedición.
+   */
+  async generarLayoutPiso(
+    expedicionId: number,
+    piso: number,
+    incluirBonus: boolean = false,
+    incluirEvento: boolean = false,
+  ): Promise<LayoutPisoResponseDto> {
+    const expedicion = await this.expedicionesService.findOne(expedicionId);
+
+    if (expedicion.estado !== EstadoExpedicion.EN_CURSO) {
+      throw new ValidationServiceException(
+        'La expedición debe estar en_curso para generar un layout de piso',
+      );
+    }
+
+    const pisoConfig = await this.configuracionService.getPiso(piso);
+
+    // Verificar que no haya salas ya generadas para este piso
+    const salasExistentes = await this.historialService.getHabitacionesByExpedicionAndPiso(
+      expedicionId,
+      piso,
+    );
+    if (salasExistentes.length > 0) {
+      throw new ConflictServiceException(
+        `Ya existen ${salasExistentes.length} salas generadas para el piso ${piso} de esta expedición`,
+      );
+    }
+
+    // Obtener tipos de habitación por nombre
+    const tipoComun = await this.configuracionService.getTipoHabitacionByNombre('comun');
+    const tipoBonus = await this.configuracionService.getTipoHabitacionByNombre('bonus');
+    const tipoJefe = await this.configuracionService.getTipoHabitacionByNombre('jefe');
+    const tipoEvento = await this.configuracionService.getTipoHabitacionByNombre('evento');
+
+    // Calcular orden base (por si hay salas de pisos anteriores)
+    const maxOrden = await this.historialService.getMaxOrden(expedicionId);
+    let ordenActual = maxOrden + 1;
+
+    const habitacionesData: any[] = [];
+
+    // N salas comunes
+    for (let i = 0; i < pisoConfig.num_habitaciones_comunes; i++) {
+      habitacionesData.push({
+        expedicion_id: expedicionId,
+        piso_numero: piso,
+        tipo_habitacion_id: tipoComun.id,
+        orden: ordenActual++,
+      });
+    }
+
+    // Sala bonus (opcional)
+    if (incluirBonus) {
+      habitacionesData.push({
+        expedicion_id: expedicionId,
+        piso_numero: piso,
+        tipo_habitacion_id: tipoBonus.id,
+        orden: ordenActual++,
+      });
+    }
+
+    // Sala evento (opcional)
+    if (incluirEvento) {
+      habitacionesData.push({
+        expedicion_id: expedicionId,
+        piso_numero: piso,
+        tipo_habitacion_id: tipoEvento.id,
+        orden: ordenActual++,
+      });
+    }
+
+    // Sala jefe (siempre)
+    habitacionesData.push({
+      expedicion_id: expedicionId,
+      piso_numero: piso,
+      tipo_habitacion_id: tipoJefe.id,
+      orden: ordenActual++,
+    });
+
+    // Crear todas las salas
+    const habitaciones = await this.historialService.registrarHabitacionesBatch(habitacionesData);
+
+    // Actualizar piso_actual
+    await this.expedicionesService.update(expedicionId, { piso_actual: piso } as any);
+
+    // Recargar con relaciones para la respuesta
+    const habitacionesConRelaciones = await this.historialService.getHabitacionesByExpedicionAndPiso(
+      expedicionId,
+      piso,
+    );
+
+    return LayoutPisoResponseDto.fromEntities(expedicionId, piso, habitacionesConRelaciones);
+  }
+
+  /**
+   * Resuelve el encuentro de una sala específica del historial.
+   * Lee piso/tipo de la habitación y delega al resolverEncuentro existente.
+   * Persiste la tirada en el registro de habitación.
+   */
+  async resolverEncuentroHabitacion(
+    historialHabitacionId: number,
+    tirada: number,
+  ): Promise<EncuentroResueltoDto> {
+    const habitacion = await this.historialService.getHistorialHabitacion(historialHabitacionId);
+
+    if (habitacion.completada) {
+      throw new ValidationServiceException('Esta habitación ya fue completada');
+    }
+
+    const resultado = await this.resolverEncuentro(
+      habitacion.piso_numero,
+      habitacion.tipo_habitacion_id,
+      tirada,
+    );
+
+    // Persistir tirada y cantidad de enemigos
+    await this.historialService.updateHistorialHabitacion(historialHabitacionId, {
+      tirada_encuentro: tirada,
+      enemigos_derrotados: resultado.cantidad_total,
+    } as any);
+
+    return resultado;
+  }
+
+  /**
+   * Procesa N recompensas (1 por enemigo) de una habitación.
+   * Es un preview: NO persiste items ni oro.
+   * Retorna los resultados separados en items_pendientes (para asignar) y oro_dados.
+   */
+  async procesarRecompensasHabitacion(
+    historialHabitacionId: number,
+    tiradas: { tirada_d20: number; tirada_subtabla?: number }[],
+  ): Promise<ResultadoRecompensasHabitacionDto> {
+    const habitacion = await this.historialService.getHistorialHabitacion(historialHabitacionId);
+
+    if (habitacion.completada) {
+      throw new ValidationServiceException('Esta habitación ya fue completada');
+    }
+
+    const resultados: RecompensaResueltaDto[] = [];
+    const itemsPendientes: ItemPendienteDto[] = [];
+    const oroDados: string[] = [];
+
+    for (let i = 0; i < tiradas.length; i++) {
+      const t = tiradas[i];
+      const resultado = await this.resolverRecompensa(
+        habitacion.piso_numero,
+        habitacion.tipo_habitacion_id,
+        t.tirada_d20,
+        t.tirada_subtabla,
+      );
+      resultados.push(resultado);
+
+      if (resultado.tipo_resultado === 'subtabla' && !resultado.requiere_subtabla && resultado.item_id) {
+        itemsPendientes.push({
+          indice: i,
+          tirada_d20: t.tirada_d20,
+          tirada_subtabla: resultado.tirada_subtabla ?? null,
+          subtabla_nombre: resultado.subtabla_nombre!,
+          item_id: resultado.item_id ?? null,
+          item_nombre: resultado.item_nombre ?? null,
+          modificador_tier: resultado.modificador_tier ?? null,
+        });
+      } else if (resultado.tipo_resultado === 'oro' && resultado.dados_oro) {
+        oroDados.push(resultado.dados_oro);
+      }
+    }
+
+    return {
+      historial_habitacion_id: historialHabitacionId,
+      piso: habitacion.piso_numero,
+      tipo_habitacion_id: habitacion.tipo_habitacion_id,
+      resultados,
+      items_pendientes: itemsPendientes,
+      oro_dados: oroDados,
+    };
+  }
+
+  /**
+   * Asigna un item a un participante específico de una habitación.
+   * Crea un historial_recompensa vinculando el item al participante.
+   */
+  async asignarItemParticipante(
+    historialHabitacionId: number,
+    participacionId: number,
+    tiradaOriginal: number,
+    tiradaSubtabla: number | undefined,
+    itemId: number,
+    modificadorTier?: number,
+  ): Promise<{ id: number; historial_habitacion_id: number; participacion_id: number; item_id: number }> {
+    await this.historialService.getHistorialHabitacion(historialHabitacionId);
+
+    const recompensa = await this.historialService.registrarRecompensa({
+      historial_habitacion_id: historialHabitacionId,
+      participacion_id: participacionId,
+      tirada_original: tiradaOriginal,
+      tirada_subtabla: tiradaSubtabla ?? undefined,
+      item_id: itemId,
+      modificador_tier: modificadorTier ?? 0,
+      oro_obtenido: 0,
+      vendido: false,
+    });
+
+    return {
+      id: recompensa.id,
+      historial_habitacion_id: historialHabitacionId,
+      participacion_id: participacionId,
+      item_id: itemId,
+    };
+  }
+
+  /**
+   * Reparte oro entre los participantes ACTIVOS de la expedición de una habitación.
+   * Obtiene automáticamente los activos y distribuye equitativamente.
+   */
+  async repartirOroHabitacion(
+    historialHabitacionId: number,
+    oroTotal: number,
+  ): Promise<{ repartos: { participacion_id: number; nombre_personaje: string; oro: number }[] }> {
+    const habitacion = await this.historialService.getHistorialHabitacion(historialHabitacionId);
+
+    if (habitacion.completada) {
+      throw new ValidationServiceException('Esta habitación ya fue completada');
+    }
+
+    const participacionesActivas = await this.expedicionesService.getParticipacionesActivas(
+      habitacion.expedicion_id,
+    );
+
+    if (participacionesActivas.length === 0) {
+      throw new ValidationServiceException('No hay participantes activos en la expedición');
+    }
+
+    const participacionIds = participacionesActivas.map((p) => p.id);
+    const resultado = await this.repartirOro(historialHabitacionId, oroTotal, participacionIds);
+
+    return {
+      repartos: resultado.repartos.map((r) => {
+        const p = participacionesActivas.find((p) => p.id === r.participacion_id);
+        return {
+          participacion_id: r.participacion_id,
+          nombre_personaje: p?.nombre_personaje ?? '',
+          oro: r.oro,
+        };
+      }),
+    };
+  }
+
+  /**
+   * Marca una habitación como completada.
+   */
+  async completarHabitacion(
+    historialHabitacionId: number,
+  ): Promise<{ id: number; completada: boolean }> {
+    await this.historialService.updateHistorialHabitacion(historialHabitacionId, {
+      completada: true,
+    } as any);
+
+    return { id: historialHabitacionId, completada: true };
+  }
+
+  /**
+   * Retorna los participantes activos de una expedición.
+   */
+  async getParticipantesActivos(expedicionId: number) {
+    return this.expedicionesService.getParticipacionesActivas(expedicionId);
   }
 
   // =========================================================================

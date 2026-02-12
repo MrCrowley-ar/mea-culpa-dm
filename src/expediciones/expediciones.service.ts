@@ -91,4 +91,29 @@ export class ExpedicionesService {
     }
     await this.participacionRepo.updateOro(participacionId, oro);
   }
+
+  async getParticipacionesActivas(expedicionId: number): Promise<Participacion[]> {
+    await this.findOne(expedicionId);
+    return this.participacionRepo.findActivasByExpedicionId(expedicionId);
+  }
+
+  async desactivarParticipacion(participacionId: number, salaSalida: number): Promise<void> {
+    const p = await this.participacionRepo.findById(participacionId);
+    if (!p) {
+      throw new NotFoundServiceException(
+        `Participación con ID ${participacionId} no encontrada`,
+      );
+    }
+    await this.participacionRepo.updateActivo(participacionId, false, salaSalida);
+  }
+
+  async reactivarParticipacion(participacionId: number): Promise<void> {
+    const p = await this.participacionRepo.findById(participacionId);
+    if (!p) {
+      throw new NotFoundServiceException(
+        `Participación con ID ${participacionId} no encontrada`,
+      );
+    }
+    await this.participacionRepo.updateActivo(participacionId, true, null);
+  }
 }

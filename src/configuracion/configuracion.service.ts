@@ -61,6 +61,16 @@ export class ConfiguracionService {
     return this.tipoHabitacionRepo.findAll();
   }
 
+  async getTipoHabitacionByNombre(nombre: string): Promise<TipoHabitacion> {
+    const tipo = await this.tipoHabitacionRepo.findByNombre(nombre);
+    if (!tipo) {
+      throw new NotFoundServiceException(
+        `Tipo de habitación "${nombre}" no encontrado`,
+      );
+    }
+    return tipo;
+  }
+
   async getTipoHabitacion(id: number): Promise<TipoHabitacion> {
     const tipo = await this.tipoHabitacionRepo.findById(id);
     if (!tipo) {
