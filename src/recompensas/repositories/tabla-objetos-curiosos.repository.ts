@@ -29,6 +29,17 @@ export class TablaObjetosCuriososRepository {
     });
   }
 
+  async findByTirada(
+    pisoNumero: number,
+    tipoHabitacionId: number,
+    tirada: number,
+  ): Promise<TablaObjetosCuriosos | null> {
+    return this.repo.findOne({
+      where: { piso_numero: pisoNumero, tipo_habitacion_id: tipoHabitacionId, tirada },
+      relations: ['item'],
+    });
+  }
+
   async create(data: Partial<TablaObjetosCuriosos>): Promise<TablaObjetosCuriosos> {
     const tablaObjetosCuriosos = this.repo.create(data);
     return this.repo.save(tablaObjetosCuriosos);

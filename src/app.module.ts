@@ -9,6 +9,7 @@ import { ConfiguracionModule } from './configuracion/configuracion.module';
 import { EncuentrosModule } from './encuentros/encuentros.module';
 import { RecompensasModule } from './recompensas/recompensas.module';
 import { HistorialModule } from './historial/historial.module';
+import { GameplayModule } from './gameplay/gameplay.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { HistorialModule } from './historial/historial.module';
     EncuentrosModule,
     RecompensasModule,
     HistorialModule,
+    GameplayModule,
   ],
 })
 export class AppModule {}

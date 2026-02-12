@@ -30,6 +30,48 @@ export class RecompensasService {
     private readonly tablaCriticoRepo: TablaCriticoRepository,
   ) {}
 
+  // --- Lookup por tirada (usado por GameplayService) ---
+
+  async getRecompensaPorTirada(
+    pisoNumero: number,
+    tipoHabitacionId: number,
+    tiradaConBonus: number,
+  ): Promise<TablaRecompensa | null> {
+    return this.tablaRecompensaRepo.findByTirada(pisoNumero, tipoHabitacionId, tiradaConBonus);
+  }
+
+  async getArmaByTirada(tirada: number): Promise<TablaArma | null> {
+    return this.tablaArmaRepo.findByTirada(tirada);
+  }
+
+  async getArmaduraByTirada(tirada: number): Promise<TablaArmadura | null> {
+    return this.tablaArmaduraRepo.findByTirada(tirada);
+  }
+
+  async getObjetoCuriosoByTirada(
+    pisoNumero: number,
+    tipoHabitacionId: number,
+    tirada: number,
+  ): Promise<TablaObjetosCuriosos | null> {
+    return this.tablaObjetosCuriososRepo.findByTirada(pisoNumero, tipoHabitacionId, tirada);
+  }
+
+  async getItemBossByTirada(pisoNumero: number, tirada: number): Promise<TablaItemsBoss | null> {
+    return this.tablaItemsBossRepo.findByTirada(pisoNumero, tirada);
+  }
+
+  async getPocionByTirada(tirada: number, pisoNumero?: number): Promise<TablaPocion | null> {
+    return this.tablaPocionRepo.findByTirada(tirada, pisoNumero);
+  }
+
+  async getTesoroMenorByTirada(tirada: number, pisoNumero?: number): Promise<TablaTesroMenor | null> {
+    return this.tablaTesroMenorRepo.findByTirada(tirada, pisoNumero);
+  }
+
+  async getCriticoByTirada(tirada: number, pisoNumero?: number): Promise<TablaCritico | null> {
+    return this.tablaCriticoRepo.findByTirada(tirada, pisoNumero);
+  }
+
   // --- Tabla Recompensas ---
   async getTablaRecompensas(): Promise<TablaRecompensa[]> {
     return this.tablaRecompensaRepo.findAll();

@@ -26,6 +26,12 @@ export class TablaTesroMenorRepository {
     });
   }
 
+  async findByTirada(tirada: number, pisoNumero?: number): Promise<TablaTesroMenor | null> {
+    const where: any = { tirada };
+    if (pisoNumero) where.piso_numero = pisoNumero;
+    return this.repo.findOne({ where, relations: ['item'] });
+  }
+
   async create(data: Partial<TablaTesroMenor>): Promise<TablaTesroMenor> {
     const tablaTesroMenor = this.repo.create(data);
     return this.repo.save(tablaTesroMenor);

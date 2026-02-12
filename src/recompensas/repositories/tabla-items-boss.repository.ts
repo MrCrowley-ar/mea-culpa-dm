@@ -26,6 +26,13 @@ export class TablaItemsBossRepository {
     });
   }
 
+  async findByTirada(pisoNumero: number, tirada: number): Promise<TablaItemsBoss | null> {
+    return this.repo.findOne({
+      where: { piso_numero: pisoNumero, tirada },
+      relations: ['item'],
+    });
+  }
+
   async create(data: Partial<TablaItemsBoss>): Promise<TablaItemsBoss> {
     const tablaItemsBoss = this.repo.create(data);
     return this.repo.save(tablaItemsBoss);

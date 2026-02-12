@@ -21,11 +21,10 @@ export class TablaArmaRepository {
   }
 
   async findByTirada(tirada: number): Promise<TablaArma | null> {
-    return this.repo
-      .createQueryBuilder('tabla_arma')
-      .where('tabla_arma.rango_min <= :tirada', { tirada })
-      .andWhere('tabla_arma.rango_max >= :tirada', { tirada })
-      .getOne();
+    return this.repo.findOne({
+      where: { tirada },
+      relations: ['item'],
+    });
   }
 
   async create(data: Partial<TablaArma>): Promise<TablaArma> {

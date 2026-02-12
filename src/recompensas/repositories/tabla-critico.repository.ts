@@ -26,6 +26,12 @@ export class TablaCriticoRepository {
     });
   }
 
+  async findByTirada(tirada: number, pisoNumero?: number): Promise<TablaCritico | null> {
+    const where: any = { tirada };
+    if (pisoNumero) where.piso_numero = pisoNumero;
+    return this.repo.findOne({ where, relations: ['item'] });
+  }
+
   async create(data: Partial<TablaCritico>): Promise<TablaCritico> {
     const tablaCritico = this.repo.create(data);
     return this.repo.save(tablaCritico);
