@@ -1,14 +1,13 @@
-import {
-  Injectable,
-  UnauthorizedException,
-  ConflictException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { UsuariosService } from '../usuarios/usuarios.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import {
+  ForbiddenServiceException,
+} from '../common/exceptions/service.exception';
 
 @Injectable()
 export class AuthService {
@@ -19,18 +18,6 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
-    const existing = await this.usuariosService.findByEmail(dto.email);
-    if (existing) {
-      throw new ConflictException('El email ya está registrado');
-    }
-
-    const existingDiscord = await this.usuariosService.findByDiscordId(
-      dto.discord_id,
-    );
-    if (existingDiscord) {
-      throw new ConflictException('El Discord ID ya está registrado');
-    }
-
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const usuario = await this.usuariosService.create({
       discord_id: dto.discord_id,
@@ -45,7 +32,7 @@ export class AuthService {
   async login(dto: LoginDto) {
     const usuario = await this.usuariosService.findByEmail(dto.email);
     if (!usuario) {
-      throw new UnauthorizedException('Credenciales inválidas');
+      throw new ForbiddenServiceException('Credenciales inválidas');
     }
 
     const isPasswordValid = await bcrypt.compare(
@@ -53,7 +40,7 @@ export class AuthService {
       usuario.password_hash,
     );
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Credenciales inválidas');
+      throw new ForbiddenServiceException('Credenciales inválidas');
     }
 
     return this.generateTokens(usuario.discord_id, usuario.email, usuario.rol);
@@ -63,7 +50,9 @@ export class AuthService {
     const stored =
       await this.usuariosService.findRefreshToken(refreshToken);
     if (!stored || stored.expires_at < new Date()) {
-      throw new UnauthorizedException('Refresh token inválido o expirado');
+      throw new ForbiddenServiceException(
+        'Refresh token inválido o expirado',
+      );
     }
 
     await this.usuariosService.deleteRefreshToken(refreshToken);

@@ -1,6 +1,10 @@
-import { Injectable, ForbiddenException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Injectable } from '@nestjs/common';
+import {
+  ForbiddenServiceException,
+  NotFoundServiceException,
+} from '../common/exceptions/service.exception';
+import { ExpedicionRepository } from './repositories/expedicion.repository';
+import { ParticipacionRepository } from './repositories/participacion.repository';
 import { Expedicion } from './entities/expedicion.entity';
 import { Participacion } from './entities/participacion.entity';
 import { RolUsuario } from '../common/enums';
@@ -8,50 +12,83 @@ import { RolUsuario } from '../common/enums';
 @Injectable()
 export class ExpedicionesService {
   constructor(
-    @InjectRepository(Expedicion)
-    private readonly expedicionRepo: Repository<Expedicion>,
-    @InjectRepository(Participacion)
-    private readonly participacionRepo: Repository<Participacion>,
+    private readonly expedicionRepo: ExpedicionRepository,
+    private readonly participacionRepo: ParticipacionRepository,
   ) {}
 
   async create(
     organizadorId: string,
     rol: RolUsuario,
+    data?: Partial<Expedicion>,
   ): Promise<Expedicion> {
     if (rol !== RolUsuario.DM && rol !== RolUsuario.ADMIN) {
-      throw new ForbiddenException(
+      throw new ForbiddenServiceException(
         'Solo DMs y admins pueden crear expediciones',
       );
     }
-    const expedicion = this.expedicionRepo.create({
+    return this.expedicionRepo.create({
+      ...data,
       organizador_id: organizadorId,
     });
-    return this.expedicionRepo.save(expedicion);
   }
 
   async findAll(): Promise<Expedicion[]> {
-    return this.expedicionRepo.find({
-      relations: ['organizador', 'participaciones'],
-    });
+    return this.expedicionRepo.findAll();
   }
 
-  async findOne(id: number): Promise<Expedicion | null> {
-    return this.expedicionRepo.findOne({
-      where: { id },
-      relations: ['organizador', 'participaciones', 'participaciones.usuario'],
-    });
+  async findOne(id: number): Promise<Expedicion> {
+    const expedicion = await this.expedicionRepo.findById(id);
+    if (!expedicion) {
+      throw new NotFoundServiceException(
+        `Expedición con ID ${id} no encontrada`,
+      );
+    }
+    return expedicion;
   }
 
-  async join(
-    expedicionId: number,
-    usuarioId: string,
-    nombrePersonaje: string,
-  ): Promise<Participacion> {
-    const participacion = this.participacionRepo.create({
-      expedicion_id: expedicionId,
-      usuario_id: usuarioId,
-      nombre_personaje: nombrePersonaje,
-    });
-    return this.participacionRepo.save(participacion);
+  async update(id: number, data: Partial<Expedicion>): Promise<Expedicion> {
+    await this.findOne(id);
+    const updated = await this.expedicionRepo.update(id, data);
+    if (!updated) {
+      throw new NotFoundServiceException(
+        `Expedición con ID ${id} no encontrada`,
+      );
+    }
+    return updated;
+  }
+
+  async delete(id: number): Promise<void> {
+    await this.findOne(id);
+    await this.expedicionRepo.delete(id);
+  }
+
+  async addParticipacion(data: Partial<Participacion>): Promise<Participacion> {
+    await this.findOne(data.expedicion_id!);
+    return this.participacionRepo.create(data);
+  }
+
+  async getParticipaciones(expedicionId: number): Promise<Participacion[]> {
+    await this.findOne(expedicionId);
+    return this.participacionRepo.findByExpedicionId(expedicionId);
+  }
+
+  async removeParticipacion(id: number): Promise<void> {
+    const p = await this.participacionRepo.findById(id);
+    if (!p) {
+      throw new NotFoundServiceException(
+        `Participación con ID ${id} no encontrada`,
+      );
+    }
+    await this.participacionRepo.delete(id);
+  }
+
+  async updateOro(participacionId: number, oro: number): Promise<void> {
+    const p = await this.participacionRepo.findById(participacionId);
+    if (!p) {
+      throw new NotFoundServiceException(
+        `Participación con ID ${participacionId} no encontrada`,
+      );
+    }
+    await this.participacionRepo.updateOro(participacionId, oro);
   }
 }

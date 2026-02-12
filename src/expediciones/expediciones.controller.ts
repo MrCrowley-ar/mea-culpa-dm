@@ -2,6 +2,8 @@ import {
   Controller,
   Get,
   Post,
+  Put,
+  Delete,
   Param,
   Body,
   UseGuards,
@@ -13,39 +15,87 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolUsuario } from '../common/enums';
+import { CreateExpedicionDto } from './dto/request/create-expedicion.dto';
+import { UpdateExpedicionDto } from './dto/request/update-expedicion.dto';
+import { CreateParticipacionDto } from './dto/request/create-participacion.dto';
+import { ExpedicionResponseDto } from './dto/response/expedicion-response.dto';
+import { ParticipacionResponseDto } from './dto/response/participacion-response.dto';
 
 @Controller('expediciones')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(RolUsuario.DM, RolUsuario.ADMIN)
 export class ExpedicionesController {
   constructor(private readonly expedicionesService: ExpedicionesService) {}
 
   @Post()
-  @UseGuards(RolesGuard)
-  @Roles(RolUsuario.DM, RolUsuario.ADMIN)
-  create(@Request() req: any) {
-    return this.expedicionesService.create(req.user.discord_id, req.user.rol);
+  async create(
+    @Body() dto: CreateExpedicionDto,
+    @Request() req: any,
+  ): Promise<ExpedicionResponseDto> {
+    const expedicion = await this.expedicionesService.create(
+      req.user.discord_id,
+      req.user.rol,
+      { fecha: dto.fecha ? new Date(dto.fecha) : undefined, notas: dto.notas },
+    );
+    return ExpedicionResponseDto.fromEntity(expedicion);
   }
 
   @Get()
-  findAll() {
-    return this.expedicionesService.findAll();
+  async findAll(): Promise<ExpedicionResponseDto[]> {
+    const expediciones = await this.expedicionesService.findAll();
+    return expediciones.map(ExpedicionResponseDto.fromEntity);
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.expedicionesService.findOne(id);
+  async findOne(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<ExpedicionResponseDto> {
+    const expedicion = await this.expedicionesService.findOne(id);
+    return ExpedicionResponseDto.fromEntity(expedicion);
   }
 
-  @Post(':id/join')
-  join(
+  @Put(':id')
+  async update(
     @Param('id', ParseIntPipe) id: number,
-    @Body('nombre_personaje') nombrePersonaje: string,
-    @Request() req: any,
-  ) {
-    return this.expedicionesService.join(
-      id,
-      req.user.discord_id,
-      nombrePersonaje,
-    );
+    @Body() dto: UpdateExpedicionDto,
+  ): Promise<ExpedicionResponseDto> {
+    const expedicion = await this.expedicionesService.update(id, dto as any);
+    return ExpedicionResponseDto.fromEntity(expedicion);
+  }
+
+  @Delete(':id')
+  async delete(@Param('id', ParseIntPipe) id: number): Promise<void> {
+    await this.expedicionesService.delete(id);
+  }
+
+  // --- Participaciones ---
+
+  @Post(':id/participaciones')
+  async addParticipacion(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CreateParticipacionDto,
+  ): Promise<ParticipacionResponseDto> {
+    const p = await this.expedicionesService.addParticipacion({
+      expedicion_id: id,
+      usuario_id: dto.usuario_id,
+      nombre_personaje: dto.nombre_personaje,
+    });
+    return ParticipacionResponseDto.fromEntity(p);
+  }
+
+  @Get(':id/participaciones')
+  async getParticipaciones(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<ParticipacionResponseDto[]> {
+    const participaciones =
+      await this.expedicionesService.getParticipaciones(id);
+    return participaciones.map(ParticipacionResponseDto.fromEntity);
+  }
+
+  @Delete('participaciones/:participacionId')
+  async removeParticipacion(
+    @Param('participacionId', ParseIntPipe) participacionId: number,
+  ): Promise<void> {
+    await this.expedicionesService.removeParticipacion(participacionId);
   }
 }
