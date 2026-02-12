@@ -402,28 +402,191 @@ POST /api/historial/recompensas
 }
 ```
 
-### Paso 9: Si el personaje vende el item
+### Paso 6b: Si la recompensa es oro bruto, repartir entre N jugadores
+
+Cuando la recompensa es "oro" el DM tira los dados (ej: 2d6 = 9 de oro) y decide entre cuántos jugadores se reparte. No se asigna a uno solo, se divide:
 
 ```
-PUT /api/historial/recompensas/1
+POST /api/gameplay/repartir-oro
 ```
 
 ```json
 {
-  "vendido": true,
-  "precio_venta": 25
+  "historial_habitacion_id": 1,
+  "oro_total": 9,
+  "participacion_ids": [1, 2, 3, 4, 5]
 }
 ```
 
-### Paso 10: Actualizar oro del participante
+**Response 200:**
+```json
+{
+  "repartos": [
+    { "participacion_id": 1, "oro": 2 },
+    { "participacion_id": 2, "oro": 2 },
+    { "participacion_id": 3, "oro": 2 },
+    { "participacion_id": 4, "oro": 2 },
+    { "participacion_id": 5, "oro": 1 }
+  ]
+}
+```
+
+> 9 / 5 = 1 c/u + 4 de sobrante → los primeros 4 reciben 2, el último 1.
+> Si solo quiere repartir entre 3 jugadores de esa sala: pasa solo 3 IDs.
+> Crea automáticamente los registros en historial_recompensas con `oro_obtenido` por cada participante.
+
+### Paso 9: Ver resumen antes de repartir
+
+Al final de la expedición (o en cualquier momento), el DM puede ver un resumen de todo lo obtenido por cada personaje:
+
+```
+GET /api/gameplay/resumen-expedicion/1
+```
+
+**Response 200:**
+```json
+{
+  "expedicion_id": 1,
+  "estado": "en_curso",
+  "piso_actual": 3,
+  "total_habitaciones": 3,
+  "participantes": [
+    {
+      "participacion_id": 1,
+      "nombre_personaje": "Aldric el Guerrero",
+      "usuario_id": "111111111111111111",
+      "items": [
+        {
+          "recompensa_id": 1,
+          "habitacion_orden": 1,
+          "tirada_original": 16,
+          "tirada_subtabla": 7,
+          "item_id": 5,
+          "item_nombre": "Espada larga",
+          "modificador_tier": 0,
+          "oro_obtenido": 0,
+          "vendido": false,
+          "precio_venta": null
+        },
+        {
+          "recompensa_id": 5,
+          "habitacion_orden": 2,
+          "tirada_original": 0,
+          "tirada_subtabla": null,
+          "item_id": null,
+          "item_nombre": null,
+          "modificador_tier": null,
+          "oro_obtenido": 2,
+          "vendido": false,
+          "precio_venta": null
+        }
+      ],
+      "total_oro_bruto": 2,
+      "total_oro_ventas": 0,
+      "total_oro": 2,
+      "oro_acumulado_actual": 0
+    },
+    {
+      "participacion_id": 2,
+      "nombre_personaje": "Lyra la Maga",
+      "usuario_id": "222222222222222222",
+      "items": [
+        {
+          "recompensa_id": 3,
+          "habitacion_orden": 1,
+          "tirada_original": 18,
+          "tirada_subtabla": 3,
+          "item_id": 10,
+          "item_nombre": "Escudo de roble",
+          "modificador_tier": 0,
+          "oro_obtenido": 0,
+          "vendido": false,
+          "precio_venta": null
+        }
+      ],
+      "total_oro_bruto": 0,
+      "total_oro_ventas": 0,
+      "total_oro": 0,
+      "oro_acumulado_actual": 0
+    }
+  ],
+  "oro_total_expedicion": 2
+}
+```
+
+### Paso 10: Liquidar recompensas (decidir ventas y calcular oro final)
+
+El DM revisa el resumen y decide qué items se venden. Envía todas las decisiones de una:
+
+```
+POST /api/gameplay/liquidar-recompensas
+```
+
+```json
+{
+  "expedicion_id": 1,
+  "decisiones": [
+    { "recompensa_id": 1, "vendido": false },
+    { "recompensa_id": 3, "vendido": true, "precio_venta": 25 }
+  ]
+}
+```
+
+**Response 200:**
+```json
+{
+  "expedicion_id": 1,
+  "decisiones_aplicadas": 2,
+  "participantes": [
+    {
+      "participacion_id": 1,
+      "nombre_personaje": "Aldric el Guerrero",
+      "oro_bruto": 2,
+      "oro_ventas": 0,
+      "oro_total": 2
+    },
+    {
+      "participacion_id": 2,
+      "nombre_personaje": "Lyra la Maga",
+      "oro_bruto": 0,
+      "oro_ventas": 25,
+      "oro_total": 25
+    }
+  ],
+  "oro_total_expedicion": 27
+}
+```
+
+> Este endpoint:
+> 1. Aplica las decisiones de venta a cada recompensa
+> 2. Calcula el oro total por participante = oro_bruto + oro_ventas
+> 3. Actualiza `participacion.oro_acumulado` automáticamente
+>
+> El DM puede llamar este endpoint varias veces si necesita ajustar decisiones.
+
+### Paso 11: Actualizar oro manual (opcional)
+
+Si necesita ajustar oro manualmente:
 
 ```
 PUT /api/expediciones/participaciones/1/oro
 ```
 
-> **Nota:** Este endpoint no existe aún en los controllers actuales. El oro se maneja directamente desde el servicio. Para el front, se puede consultar las participaciones y ver el oro_acumulado.
+```json
+{
+  "oro": 50
+}
+```
 
-### Paso 11: Completar la expedición
+**Response 200:**
+```json
+{
+  "participacion_id": 1,
+  "oro_acumulado": 50
+}
+```
+
+### Paso 12: Completar la expedición
 
 ```
 PUT /api/expediciones/1
@@ -599,9 +762,10 @@ DELETE /api/expediciones/:id        → Eliminar
 ### Participaciones
 
 ```
-GET    /api/expediciones/:id/participaciones              → Listar participantes
-POST   /api/expediciones/:id/participaciones              → Agregar participante
-DELETE /api/expediciones/participaciones/:participacionId  → Quitar participante
+GET    /api/expediciones/:id/participaciones                        → Listar participantes
+POST   /api/expediciones/:id/participaciones                        → Agregar participante
+DELETE /api/expediciones/participaciones/:participacionId            → Quitar participante
+PUT    /api/expediciones/participaciones/:participacionId/oro       → Actualizar oro
 ```
 
 **Agregar:**
@@ -610,6 +774,11 @@ DELETE /api/expediciones/participaciones/:participacionId  → Quitar participan
   "usuario_id": "123456789012345678",
   "nombre_personaje": "Aldric el Guerrero"
 }
+```
+
+**Actualizar oro:**
+```json
+{ "oro": 50 }
 ```
 
 ---
@@ -949,6 +1118,69 @@ Si cae en "subtabla", devuelve `requiere_subtabla: true`:
 ```
 
 > Si `tirada_subtabla` viene vacío y se necesita subtabla, la API responde con `requiere_subtabla: true` para que el front pida al DM que tire de nuevo.
+
+### Repartir Oro
+
+Cuando la recompensa es "oro", el DM tira los dados, obtiene un total, y lo reparte entre los jugadores que elija.
+
+```
+POST /api/gameplay/repartir-oro
+```
+
+```json
+{
+  "historial_habitacion_id": 1,
+  "oro_total": 9,
+  "participacion_ids": [1, 2, 3]
+}
+```
+
+**Response 200:**
+```json
+{
+  "repartos": [
+    { "participacion_id": 1, "oro": 3 },
+    { "participacion_id": 2, "oro": 3 },
+    { "participacion_id": 3, "oro": 3 }
+  ]
+}
+```
+
+> Crea un registro `historial_recompensa` por cada participante con su `oro_obtenido`.
+> El sobrante (si no es divisible) se reparte 1 extra a los primeros.
+
+### Resumen de Expedición
+
+Vista completa de lo obtenido por cada personaje durante la expedición.
+
+```
+GET /api/gameplay/resumen-expedicion/:expedicionId
+```
+
+**Response 200:** Ver [Paso 9 del flujo completo](#paso-9-ver-resumen-antes-de-repartir) para el ejemplo detallado.
+
+### Liquidar Recompensas
+
+Aplica decisiones de venta en lote y calcula el oro final por personaje.
+
+```
+POST /api/gameplay/liquidar-recompensas
+```
+
+```json
+{
+  "expedicion_id": 1,
+  "decisiones": [
+    { "recompensa_id": 1, "vendido": false },
+    { "recompensa_id": 3, "vendido": true, "precio_venta": 25 },
+    { "recompensa_id": 7, "vendido": true, "precio_venta": 10 }
+  ]
+}
+```
+
+**Response 200:** Ver [Paso 10 del flujo completo](#paso-10-liquidar-recompensas-decidir-ventas-y-calcular-oro-final) para el ejemplo detallado.
+
+> Actualiza automáticamente `participacion.oro_acumulado` para cada personaje.
 
 ---
 

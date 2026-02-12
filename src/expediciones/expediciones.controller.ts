@@ -98,4 +98,13 @@ export class ExpedicionesController {
   ): Promise<void> {
     await this.expedicionesService.removeParticipacion(participacionId);
   }
+
+  @Put('participaciones/:participacionId/oro')
+  async updateOro(
+    @Param('participacionId', ParseIntPipe) participacionId: number,
+    @Body() body: { oro: number },
+  ): Promise<{ participacion_id: number; oro_acumulado: number }> {
+    await this.expedicionesService.updateOro(participacionId, body.oro);
+    return { participacion_id: participacionId, oro_acumulado: body.oro };
+  }
 }

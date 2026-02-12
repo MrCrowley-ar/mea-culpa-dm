@@ -1,13 +1,27 @@
 import { Injectable } from '@nestjs/common';
-import { NotFoundServiceException } from '../common/exceptions/service.exception';
+import {
+  NotFoundServiceException,
+  ValidationServiceException,
+} from '../common/exceptions/service.exception';
 import { TipoResultadoRecompensa } from '../common/enums';
 import { ConfiguracionService } from '../configuracion/configuracion.service';
 import { EncuentrosService } from '../encuentros/encuentros.service';
 import { RecompensasService } from '../recompensas/recompensas.service';
+import { HistorialService } from '../historial/historial.service';
+import { ExpedicionesService } from '../expediciones/expediciones.service';
 import {
   EncuentroResueltoDto,
 } from './dto/response/encuentro-resuelto.dto';
 import { RecompensaResueltaDto } from './dto/response/recompensa-resuelta.dto';
+import {
+  ResumenExpedicionDto,
+  ParticipanteResumenDto,
+  ItemResumenDto,
+} from './dto/response/resumen-expedicion.dto';
+import {
+  LiquidacionResultadoDto,
+  ParticipanteLiquidadoDto,
+} from './dto/response/liquidacion-resultado.dto';
 
 @Injectable()
 export class GameplayService {
@@ -15,6 +29,8 @@ export class GameplayService {
     private readonly configuracionService: ConfiguracionService,
     private readonly encuentrosService: EncuentrosService,
     private readonly recompensasService: RecompensasService,
+    private readonly historialService: HistorialService,
+    private readonly expedicionesService: ExpedicionesService,
   ) {}
 
   /**
@@ -320,5 +336,171 @@ export class GameplayService {
       item_id: entrada.item_id,
       descripcion,
     });
+  }
+
+  // =========================================================================
+  // REPARTO DE ORO
+  // =========================================================================
+
+  /**
+   * Reparte oro bruto entre N participantes de una habitación.
+   * El DM tira los dados de oro, informa el total, y elige entre cuántos se reparte.
+   * El sobrante (si no es divisible) se reparte 1 extra a los primeros.
+   */
+  async repartirOro(
+    historialHabitacionId: number,
+    oroTotal: number,
+    participacionIds: number[],
+  ): Promise<{ repartos: { participacion_id: number; oro: number }[] }> {
+    await this.historialService.getHistorialHabitacion(historialHabitacionId);
+
+    if (participacionIds.length === 0) {
+      throw new ValidationServiceException('Debe indicar al menos un participante');
+    }
+
+    const oroPorJugador = Math.floor(oroTotal / participacionIds.length);
+    const sobrante = oroTotal % participacionIds.length;
+    const repartos: { participacion_id: number; oro: number }[] = [];
+
+    for (let i = 0; i < participacionIds.length; i++) {
+      const oroAsignado = oroPorJugador + (i < sobrante ? 1 : 0);
+      await this.historialService.registrarRecompensa({
+        historial_habitacion_id: historialHabitacionId,
+        participacion_id: participacionIds[i],
+        tirada_original: 0,
+        oro_obtenido: oroAsignado,
+        vendido: false,
+      });
+      repartos.push({ participacion_id: participacionIds[i], oro: oroAsignado });
+    }
+
+    return { repartos };
+  }
+
+  // =========================================================================
+  // RESUMEN DE EXPEDICIÓN
+  // =========================================================================
+
+  /**
+   * Genera un resumen completo de la expedición agrupado por participante:
+   * - Items obtenidos (con datos de venta si aplica)
+   * - Oro bruto total
+   * - Oro por ventas
+   * - Oro total
+   */
+  async getResumenExpedicion(expedicionId: number): Promise<ResumenExpedicionDto> {
+    const expedicion = await this.expedicionesService.findOne(expedicionId);
+    const participaciones = await this.expedicionesService.getParticipaciones(expedicionId);
+    const habitaciones = await this.historialService.getHistorialExpedicion(expedicionId);
+
+    // Agrupar recompensas por participacion_id
+    const recompensasPorParticipante = new Map<number, ItemResumenDto[]>();
+
+    for (const participacion of participaciones) {
+      recompensasPorParticipante.set(participacion.id, []);
+    }
+
+    for (const habitacion of habitaciones) {
+      const recompensas = habitacion.recompensas || [];
+      for (const r of recompensas) {
+        const items = recompensasPorParticipante.get(r.participacion_id);
+        if (items) {
+          items.push({
+            recompensa_id: r.id,
+            habitacion_orden: habitacion.orden,
+            tirada_original: r.tirada_original,
+            tirada_subtabla: r.tirada_subtabla ?? null,
+            item_id: r.item_id ?? null,
+            item_nombre: r.item?.nombre ?? null,
+            modificador_tier: r.modificador_tier ?? null,
+            oro_obtenido: r.oro_obtenido ?? 0,
+            vendido: r.vendido ?? false,
+            precio_venta: r.precio_venta ?? null,
+          });
+        }
+      }
+    }
+
+    let oroTotalExpedicion = 0;
+    const participantesResumen: ParticipanteResumenDto[] = participaciones.map((p) => {
+      const items = recompensasPorParticipante.get(p.id) || [];
+      const totalOroBruto = items.reduce((sum, i) => sum + i.oro_obtenido, 0);
+      const totalOroVentas = items
+        .filter((i) => i.vendido && i.precio_venta)
+        .reduce((sum, i) => sum + (i.precio_venta ?? 0), 0);
+      const totalOro = totalOroBruto + totalOroVentas;
+      oroTotalExpedicion += totalOro;
+
+      return {
+        participacion_id: p.id,
+        nombre_personaje: p.nombre_personaje,
+        usuario_id: p.usuario_id,
+        items,
+        total_oro_bruto: totalOroBruto,
+        total_oro_ventas: totalOroVentas,
+        total_oro: totalOro,
+        oro_acumulado_actual: p.oro_acumulado,
+      };
+    });
+
+    return {
+      expedicion_id: expedicionId,
+      estado: expedicion.estado,
+      piso_actual: expedicion.piso_actual,
+      total_habitaciones: habitaciones.length,
+      participantes: participantesResumen,
+      oro_total_expedicion: oroTotalExpedicion,
+    };
+  }
+
+  // =========================================================================
+  // LIQUIDAR RECOMPENSAS
+  // =========================================================================
+
+  /**
+   * Aplica las decisiones de venta del DM y calcula el oro final por participante.
+   * 1. Actualiza cada recompensa con vendido/precio_venta
+   * 2. Recalcula oro total por participante
+   * 3. Actualiza participacion.oro_acumulado
+   */
+  async liquidarRecompensas(
+    expedicionId: number,
+    decisiones: { recompensa_id: number; vendido: boolean; precio_venta?: number }[],
+  ): Promise<LiquidacionResultadoDto> {
+    await this.expedicionesService.findOne(expedicionId);
+
+    // 1. Aplicar decisiones de venta
+    for (const d of decisiones) {
+      await this.historialService.updateHistorialRecompensa(d.recompensa_id, {
+        vendido: d.vendido,
+        precio_venta: d.vendido ? (d.precio_venta ?? 0) : 0,
+      } as any);
+    }
+
+    // 2. Obtener resumen actualizado
+    const resumen = await this.getResumenExpedicion(expedicionId);
+
+    // 3. Actualizar oro_acumulado de cada participante
+    const participantes: ParticipanteLiquidadoDto[] = [];
+    let oroTotalExpedicion = 0;
+
+    for (const p of resumen.participantes) {
+      await this.expedicionesService.updateOro(p.participacion_id, p.total_oro);
+      participantes.push({
+        participacion_id: p.participacion_id,
+        nombre_personaje: p.nombre_personaje,
+        oro_bruto: p.total_oro_bruto,
+        oro_ventas: p.total_oro_ventas,
+        oro_total: p.total_oro,
+      });
+      oroTotalExpedicion += p.total_oro;
+    }
+
+    return {
+      expedicion_id: expedicionId,
+      decisiones_aplicadas: decisiones.length,
+      participantes,
+      oro_total_expedicion: oroTotalExpedicion,
+    };
   }
 }
