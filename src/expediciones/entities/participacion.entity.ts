@@ -38,6 +38,12 @@ export class Participacion {
   @Column({ type: 'int', default: 0 })
   oro_acumulado: number;
 
+  @Column({ type: 'boolean', default: true })
+  activo: boolean;
+
+  @Column({ type: 'int', nullable: true })
+  sala_salida: number;
+
   @CreateDateColumn()
   created_at: Date;
 

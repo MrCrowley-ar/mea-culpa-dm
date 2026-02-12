@@ -33,4 +33,19 @@ export class ParticipacionRepository {
   async updateOro(id: number, oro: number): Promise<void> {
     await this.repo.update(id, { oro_acumulado: oro });
   }
+
+  async findActivasByExpedicionId(expedicionId: number): Promise<Participacion[]> {
+    return this.repo.find({
+      where: { expedicion_id: expedicionId, activo: true },
+      relations: ['usuario'],
+    });
+  }
+
+  async updateActivo(id: number, activo: boolean, salaSalida?: number | null): Promise<void> {
+    const updateData: Partial<Participacion> = { activo };
+    if (salaSalida !== undefined) {
+      updateData.sala_salida = salaSalida as any;
+    }
+    await this.repo.update(id, updateData);
+  }
 }

@@ -45,4 +45,24 @@ export class HistorialHabitacionRepository {
   async delete(id: number): Promise<void> {
     await this.repo.delete(id);
   }
+
+  async findByExpedicionAndPiso(
+    expedicionId: number,
+    pisoNumero: number,
+  ): Promise<HistorialHabitacion[]> {
+    return this.repo.find({
+      where: { expedicion_id: expedicionId, piso_numero: pisoNumero },
+      relations: ['tipo_habitacion'],
+      order: { orden: 'ASC' },
+    });
+  }
+
+  async getMaxOrden(expedicionId: number): Promise<number> {
+    const result = await this.repo
+      .createQueryBuilder('hh')
+      .select('MAX(hh.orden)', 'maxOrden')
+      .where('hh.expedicion_id = :expedicionId', { expedicionId })
+      .getRawOne();
+    return result?.maxOrden ?? 0;
+  }
 }
