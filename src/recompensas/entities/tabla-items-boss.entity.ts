@@ -11,7 +11,7 @@ import { Piso } from '../../configuracion/entities/piso.entity';
 import { Item } from '../../configuracion/entities/item.entity';
 
 @Entity({ name: 'tabla_items_boss', schema: 'expediciones' })
-@Unique(['piso_numero', 'tirada'])
+@Unique(['piso_numero', 'variante', 'tirada'])
 @Check('"tirada" BETWEEN 1 AND 20')
 export class TablaItemsBoss {
   @PrimaryGeneratedColumn()
@@ -33,4 +33,7 @@ export class TablaItemsBoss {
   @ManyToOne(() => Item)
   @JoinColumn({ name: 'item_id' })
   item: Item;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  variante: string;
 }

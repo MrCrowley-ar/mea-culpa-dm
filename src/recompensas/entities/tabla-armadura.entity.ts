@@ -14,7 +14,7 @@ export class TablaArmadura {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: 'int', unique: true })
+  @Column({ type: 'int' })
   tirada: number;
 
   @Column({ type: 'int' })
@@ -23,4 +23,7 @@ export class TablaArmadura {
   @ManyToOne(() => Item)
   @JoinColumn({ name: 'item_id' })
   item: Item;
+
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  contexto: string;
 }

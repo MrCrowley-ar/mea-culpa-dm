@@ -8,6 +8,7 @@ import { TablaArmadura } from './entities/tabla-armadura.entity';
 import { TablaPocion } from './entities/tabla-pocion.entity';
 import { TablaTesroMenor } from './entities/tabla-tesoro-menor.entity';
 import { TablaCritico } from './entities/tabla-critico.entity';
+import { TablaEventoBonus } from './entities/tabla-evento-bonus.entity';
 import { TablaRecompensaRepository } from './repositories/tabla-recompensa.repository';
 import { TablaObjetosCuriososRepository } from './repositories/tabla-objetos-curiosos.repository';
 import { TablaItemsBossRepository } from './repositories/tabla-items-boss.repository';
@@ -30,6 +31,7 @@ import { RecompensasController } from './recompensas.controller';
       TablaPocion,
       TablaTesroMenor,
       TablaCritico,
+      TablaEventoBonus,
     ]),
   ],
   providers: [

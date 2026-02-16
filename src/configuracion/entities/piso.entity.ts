@@ -26,4 +26,7 @@ export class Piso {
 
   @Column({ type: 'int', default: 4 })
   num_habitaciones_comunes: number;
+
+  @Column({ type: 'int', default: 0 })
+  mod_encuentro: number;
 }

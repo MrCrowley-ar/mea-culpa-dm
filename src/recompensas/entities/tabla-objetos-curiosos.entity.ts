@@ -4,7 +4,6 @@ import {
   Column,
   ManyToOne,
   JoinColumn,
-  Unique,
   Check,
 } from 'typeorm';
 import { Piso } from '../../configuracion/entities/piso.entity';
@@ -12,23 +11,22 @@ import { TipoHabitacion } from '../../configuracion/entities/tipo-habitacion.ent
 import { Item } from '../../configuracion/entities/item.entity';
 
 @Entity({ name: 'tabla_objetos_curiosos', schema: 'expediciones' })
-@Unique(['piso_numero', 'tipo_habitacion_id', 'tirada'])
 @Check('"tirada" BETWEEN 1 AND 20')
 export class TablaObjetosCuriosos {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: 'int' })
+  @Column({ type: 'int', nullable: true })
   piso_numero: number;
 
-  @ManyToOne(() => Piso)
+  @ManyToOne(() => Piso, { nullable: true })
   @JoinColumn({ name: 'piso_numero', referencedColumnName: 'numero' })
   piso: Piso;
 
-  @Column({ type: 'int' })
+  @Column({ type: 'int', nullable: true })
   tipo_habitacion_id: number;
 
-  @ManyToOne(() => TipoHabitacion)
+  @ManyToOne(() => TipoHabitacion, { nullable: true })
   @JoinColumn({ name: 'tipo_habitacion_id' })
   tipo_habitacion: TipoHabitacion;
 
