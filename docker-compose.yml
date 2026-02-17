@@ -5,9 +5,9 @@ services:
     image: postgres:16
     container_name: expediciones_db
     environment:
-      POSTGRES_DB: expediciones_db
-      POSTGRES_USER: expediciones
-      POSTGRES_PASSWORD: expediciones123
+      POSTGRES_DB: mea-culpa-db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
     ports:
       - '5432:5432'
     volumes:
