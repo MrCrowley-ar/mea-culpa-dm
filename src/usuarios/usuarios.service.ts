@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import {
   ConflictServiceException,
+  ForbiddenServiceException,
   NotFoundServiceException,
 } from '../common/exceptions/service.exception';
 import { UsuarioRepository } from './repositories/usuario.repository';
 import { RefreshTokenRepository } from './repositories/refresh-token.repository';
+import { AllowedDiscordIdRepository } from './repositories/allowed-discord-id.repository';
 import { Usuario } from './entities/usuario.entity';
 
 @Injectable()
@@ -12,6 +14,7 @@ export class UsuariosService {
   constructor(
     private readonly usuarioRepo: UsuarioRepository,
     private readonly refreshTokenRepo: RefreshTokenRepository,
+    private readonly allowedDiscordIdRepo: AllowedDiscordIdRepository,
   ) {}
 
   async findByDiscordId(discordId: string): Promise<Usuario> {
@@ -28,15 +31,16 @@ export class UsuariosService {
     return this.usuarioRepo.findByDiscordId(discordId);
   }
 
-  async findByEmail(email: string): Promise<Usuario | null> {
-    return this.usuarioRepo.findByEmail(email);
+  async verifyAllowedDiscordId(discordId: string): Promise<void> {
+    const allowed = await this.allowedDiscordIdRepo.findById(discordId);
+    if (!allowed) {
+      throw new ForbiddenServiceException(
+        'Este Discord ID no está autorizado para registrarse',
+      );
+    }
   }
 
   async create(data: Partial<Usuario>): Promise<Usuario> {
-    const existingEmail = await this.usuarioRepo.findByEmail(data.email!);
-    if (existingEmail) {
-      throw new ConflictServiceException('El email ya está registrado');
-    }
     const existingDiscord = await this.usuarioRepo.findByDiscordId(
       data.discord_id!,
     );

@@ -14,10 +14,6 @@ export class UsuarioRepository {
     return this.repo.findOne({ where: { discord_id: id } });
   }
 
-  async findByEmail(email: string): Promise<Usuario | null> {
-    return this.repo.findOne({ where: { email } });
-  }
-
   async create(data: Partial<Usuario>): Promise<Usuario> {
     const usuario = this.repo.create(data);
     return this.repo.save(usuario);

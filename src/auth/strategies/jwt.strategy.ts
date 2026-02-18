@@ -5,7 +5,6 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 
 export interface JwtPayload {
   sub: string;
-  email: string;
   rol: string;
 }
 
@@ -22,7 +21,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   validate(payload: JwtPayload) {
     return {
       discord_id: payload.sub,
-      email: payload.email,
       rol: payload.rol,
     };
   }
