@@ -8,6 +8,7 @@ import { LoginDto } from './dto/login.dto';
 import {
   ForbiddenServiceException,
 } from '../common/exceptions/service.exception';
+import { RolUsuario } from '../common/enums';
 
 @Injectable()
 export class AuthService {
@@ -25,12 +26,15 @@ export class AuthService {
       discord_id: dto.discord_id,
       nombre: dto.nombre,
       password_hash: passwordHash,
+      rol: RolUsuario.DM,
     });
 
     return this.generateTokens(usuario.discord_id, usuario.rol);
   }
 
   async login(dto: LoginDto) {
+    await this.usuariosService.verifyAllowedDiscordId(dto.discord_id);
+
     const usuario = await this.usuariosService.findByDiscordIdOrNull(dto.discord_id);
     if (!usuario) {
       throw new ForbiddenServiceException('Credenciales inválidas');
