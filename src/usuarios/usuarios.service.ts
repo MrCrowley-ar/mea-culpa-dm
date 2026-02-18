@@ -8,6 +8,7 @@ import { UsuarioRepository } from './repositories/usuario.repository';
 import { RefreshTokenRepository } from './repositories/refresh-token.repository';
 import { AllowedDiscordIdRepository } from './repositories/allowed-discord-id.repository';
 import { Usuario } from './entities/usuario.entity';
+import { RolUsuario } from '../common/enums';
 
 @Injectable()
 export class UsuariosService {
@@ -48,6 +49,58 @@ export class UsuariosService {
       throw new ConflictServiceException('El Discord ID ya está registrado');
     }
     return this.usuarioRepo.create(data);
+  }
+
+  async update(discordId: string, data: Partial<Usuario>): Promise<Usuario> {
+    const usuario = await this.usuarioRepo.findByDiscordId(discordId);
+    if (!usuario) {
+      throw new NotFoundServiceException(
+        `Usuario con Discord ID ${discordId} no encontrado`,
+      );
+    }
+    const updated = await this.usuarioRepo.update(discordId, data);
+    return updated!;
+  }
+
+  async createJugador(discordId: string, nombre: string): Promise<Usuario> {
+    const existing = await this.usuarioRepo.findByDiscordId(discordId);
+    if (existing) {
+      throw new ConflictServiceException('El Discord ID ya está registrado');
+    }
+    return this.usuarioRepo.create({
+      discord_id: discordId,
+      nombre,
+      password_hash: null,
+      rol: RolUsuario.PLAYER,
+    });
+  }
+
+  async findJugadores(): Promise<Usuario[]> {
+    return this.usuarioRepo.findByRol(RolUsuario.PLAYER);
+  }
+
+  async addAllowedDiscordId(discordId: string, nota?: string): Promise<void> {
+    const existing = await this.allowedDiscordIdRepo.findById(discordId);
+    if (existing) {
+      throw new ConflictServiceException(
+        'Este Discord ID ya está en la lista de permitidos',
+      );
+    }
+    await this.allowedDiscordIdRepo.create({ discord_id: discordId, nota });
+  }
+
+  async removeAllowedDiscordId(discordId: string): Promise<void> {
+    const existing = await this.allowedDiscordIdRepo.findById(discordId);
+    if (!existing) {
+      throw new NotFoundServiceException(
+        'Este Discord ID no está en la lista de permitidos',
+      );
+    }
+    await this.allowedDiscordIdRepo.delete(discordId);
+  }
+
+  async getAllowedDiscordIds() {
+    return this.allowedDiscordIdRepo.findAll();
   }
 
   async findAll(): Promise<Usuario[]> {

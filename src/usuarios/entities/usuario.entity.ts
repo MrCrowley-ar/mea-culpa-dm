@@ -18,8 +18,8 @@ export class Usuario {
   @Column({ type: 'varchar', length: 100 })
   nombre: string;
 
-  @Column({ type: 'varchar', length: 255 })
-  password_hash: string;
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  password_hash: string | null;
 
   @Column({ type: 'enum', enum: RolUsuario, default: RolUsuario.PLAYER })
   rol: RolUsuario;

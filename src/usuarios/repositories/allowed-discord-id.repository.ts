@@ -17,4 +17,13 @@ export class AllowedDiscordIdRepository {
   async findAll(): Promise<AllowedDiscordId[]> {
     return this.repo.find();
   }
+
+  async create(data: Partial<AllowedDiscordId>): Promise<AllowedDiscordId> {
+    const allowed = this.repo.create(data);
+    return this.repo.save(allowed);
+  }
+
+  async delete(discordId: string): Promise<void> {
+    await this.repo.delete({ discord_id: discordId });
+  }
 }

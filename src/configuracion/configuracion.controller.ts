@@ -72,12 +72,14 @@ export class ConfiguracionController {
   }
 
   @Post('items')
+  @Roles(RolUsuario.ADMIN)
   async createItem(@Body() dto: CreateItemDto): Promise<ItemResponseDto> {
     const item = await this.configuracionService.createItem(dto as any);
     return ItemResponseDto.fromEntity(item);
   }
 
   @Put('items/:id')
+  @Roles(RolUsuario.ADMIN)
   async updateItem(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateItemDto,
@@ -87,6 +89,7 @@ export class ConfiguracionController {
   }
 
   @Delete('items/:id')
+  @Roles(RolUsuario.ADMIN)
   async deleteItem(@Param('id', ParseIntPipe) id: number): Promise<void> {
     await this.configuracionService.deleteItem(id);
   }

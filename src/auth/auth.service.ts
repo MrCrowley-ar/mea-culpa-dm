@@ -6,6 +6,7 @@ import { UsuariosService } from '../usuarios/usuarios.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import {
+  ConflictServiceException,
   ForbiddenServiceException,
 } from '../common/exceptions/service.exception';
 import { RolUsuario } from '../common/enums';
@@ -22,6 +23,21 @@ export class AuthService {
     await this.usuariosService.verifyAllowedDiscordId(dto.discord_id);
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
+
+    // Si ya existe como jugador sin password, promover a DM
+    const existing = await this.usuariosService.findByDiscordIdOrNull(dto.discord_id);
+    if (existing) {
+      if (existing.password_hash) {
+        throw new ConflictServiceException('Este Discord ID ya está registrado como DM');
+      }
+      const usuario = await this.usuariosService.update(dto.discord_id, {
+        nombre: dto.nombre,
+        password_hash: passwordHash,
+        rol: RolUsuario.DM,
+      });
+      return this.generateTokens(usuario.discord_id, usuario.rol);
+    }
+
     const usuario = await this.usuariosService.create({
       discord_id: dto.discord_id,
       nombre: dto.nombre,
@@ -36,7 +52,7 @@ export class AuthService {
     await this.usuariosService.verifyAllowedDiscordId(dto.discord_id);
 
     const usuario = await this.usuariosService.findByDiscordIdOrNull(dto.discord_id);
-    if (!usuario) {
+    if (!usuario || !usuario.password_hash) {
       throw new ForbiddenServiceException('Credenciales inválidas');
     }
 
