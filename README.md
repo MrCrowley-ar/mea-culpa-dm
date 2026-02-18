@@ -50,7 +50,7 @@ El sistema cuenta con tres roles diferenciados:
 
 ### 3.2 Autenticación
 
-- **Identificación:** Discord ID + Email
+- **Identificación:** Discord ID (debe estar en la whitelist de IDs permitidos)
 - **Contraseña:** Hash con bcrypt
 - **Sesiones:** JWT con refresh tokens
 
@@ -62,7 +62,8 @@ El sistema cuenta con tres roles diferenciados:
 
 | Entidad | Descripción |
 |---------|-------------|
-| **usuarios** | Usuarios con Discord ID, email, password, rol (player/dm/admin) |
+| **usuarios** | Usuarios con Discord ID, password, rol (player/dm/admin) |
+| **allowed_discord_ids** | Whitelist de Discord IDs autorizados para registrarse |
 | **refresh_tokens** | Tokens JWT para mantener sesiones activas |
 | **expediciones** | Partidas organizadas con fecha, estado y organizador (solo DM/admin) |
 | **participaciones** | Relación usuario-expedición con nombre de personaje y oro acumulado |
@@ -120,7 +121,7 @@ Cuando un arma o armadura sale como recompensa, se aplica el modificador del tie
 
 ## 6. Flujo del Juego
 
-1. **Login:** Usuario se autentica con email/password
+1. **Login:** Usuario se autentica con Discord ID/password
 2. **Creación de expedición:** Un DM o admin crea una nueva expedición
 3. **Unión de jugadores:** Hasta 5 jugadores se unen eligiendo un personaje
 4. **Exploración de habitación:** Se tira 1d20 para determinar enemigos
