@@ -5,7 +5,7 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 
 export interface JwtPayload {
   sub: string;
-  rol: string;
+  roles: string[];
 }
 
 @Injectable()
@@ -21,7 +21,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   validate(payload: JwtPayload) {
     return {
       discord_id: payload.sub,
-      rol: payload.rol,
+      roles: payload.roles,
     };
   }
 }

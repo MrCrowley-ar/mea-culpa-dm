@@ -18,12 +18,12 @@ export class ParticipacionRepository {
   async findByExpedicionId(expedicionId: number): Promise<Participacion[]> {
     return this.repo.find({
       where: { expedicion_id: expedicionId },
-      relations: ['usuario'],
+      relations: ['usuario', 'personaje'],
     });
   }
 
   async findById(id: number): Promise<Participacion | null> {
-    return this.repo.findOne({ where: { id } });
+    return this.repo.findOne({ where: { id }, relations: ['usuario', 'personaje'] });
   }
 
   async delete(id: number): Promise<void> {
@@ -37,7 +37,7 @@ export class ParticipacionRepository {
   async findActivasByExpedicionId(expedicionId: number): Promise<Participacion[]> {
     return this.repo.find({
       where: { expedicion_id: expedicionId, activo: true },
-      relations: ['usuario'],
+      relations: ['usuario', 'personaje'],
     });
   }
 

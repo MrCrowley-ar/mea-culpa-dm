@@ -6,6 +6,7 @@ import {
   Param,
   Body,
   UseGuards,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { UsuariosService } from './usuarios.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -13,7 +14,9 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolUsuario } from '../common/enums';
 import { UsuarioResponseDto } from './dto/response/usuario-response.dto';
+import { PersonajeResponseDto } from './dto/response/personaje-response.dto';
 import { CreateJugadorDto } from './dto/request/create-jugador.dto';
+import { CreatePersonajeDto } from './dto/request/create-personaje.dto';
 import { PromoverDmDto } from './dto/request/promover-dm.dto';
 
 @Controller('usuarios')
@@ -47,6 +50,40 @@ export class UsuariosController {
     return UsuarioResponseDto.fromEntity(jugador);
   }
 
+  // --- Personajes ---
+
+  @Get(':discordId/personajes')
+  @Roles(RolUsuario.DM, RolUsuario.ADMIN)
+  async getPersonajes(
+    @Param('discordId') discordId: string,
+  ): Promise<PersonajeResponseDto[]> {
+    const personajes = await this.usuariosService.getPersonajes(discordId);
+    return personajes.map(PersonajeResponseDto.fromEntity);
+  }
+
+  @Post(':discordId/personajes')
+  @Roles(RolUsuario.DM, RolUsuario.ADMIN)
+  async createPersonaje(
+    @Param('discordId') discordId: string,
+    @Body() dto: CreatePersonajeDto,
+  ): Promise<PersonajeResponseDto> {
+    const personaje = await this.usuariosService.createPersonaje(
+      discordId,
+      dto.nombre,
+    );
+    return PersonajeResponseDto.fromEntity(personaje);
+  }
+
+  @Delete('personajes/:personajeId')
+  @Roles(RolUsuario.DM, RolUsuario.ADMIN)
+  async deletePersonaje(
+    @Param('personajeId', ParseIntPipe) personajeId: number,
+  ): Promise<void> {
+    await this.usuariosService.deletePersonaje(personajeId);
+  }
+
+  // --- Promover DM ---
+
   @Post('promover-dm')
   @Roles(RolUsuario.ADMIN)
   async promoverDm(@Body() dto: PromoverDmDto): Promise<{ message: string }> {
@@ -55,6 +92,8 @@ export class UsuariosController {
       message: `Discord ID ${dto.discord_id} agregado a la lista de permitidos. El jugador puede registrarse como DM.`,
     };
   }
+
+  // --- Allowed Discord IDs ---
 
   @Get('allowed')
   @Roles(RolUsuario.ADMIN)
@@ -69,6 +108,8 @@ export class UsuariosController {
   ): Promise<void> {
     await this.usuariosService.removeAllowedDiscordId(discordId);
   }
+
+  // --- Detalle usuario ---
 
   @Get(':discordId')
   @Roles(RolUsuario.DM, RolUsuario.ADMIN)

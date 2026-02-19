@@ -18,10 +18,11 @@ export class ExpedicionesService {
 
   async create(
     organizadorId: string,
-    rol: RolUsuario,
+    roles: string[],
     data?: Partial<Expedicion>,
   ): Promise<Expedicion> {
-    if (rol !== RolUsuario.DM && rol !== RolUsuario.ADMIN) {
+    const hasPermission = roles.includes(RolUsuario.DM) || roles.includes(RolUsuario.ADMIN);
+    if (!hasPermission) {
       throw new ForbiddenServiceException(
         'Solo DMs y admins pueden crear expediciones',
       );

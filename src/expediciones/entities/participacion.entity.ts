@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { Expedicion } from './expedicion.entity';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
+import { Personaje } from '../../usuarios/entities/personaje.entity';
 import { HistorialRecompensa } from '../../historial/entities/historial-recompensa.entity';
 
 @Entity({ name: 'participaciones', schema: 'expediciones' })
@@ -32,8 +33,12 @@ export class Participacion {
   @JoinColumn({ name: 'usuario_id' })
   usuario: Usuario;
 
-  @Column({ type: 'varchar', length: 100 })
-  nombre_personaje: string;
+  @Column({ type: 'int' })
+  personaje_id: number;
+
+  @ManyToOne(() => Personaje)
+  @JoinColumn({ name: 'personaje_id' })
+  personaje: Personaje;
 
   @Column({ type: 'int', default: 0 })
   oro_acumulado: number;

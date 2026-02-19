@@ -20,7 +20,7 @@ export class HistorialRecompensaRepository {
   ): Promise<HistorialRecompensa[]> {
     return this.repo.find({
       where: { historial_habitacion_id: habitacionId },
-      relations: ['item', 'participacion'],
+      relations: ['item', 'participacion', 'participacion.personaje'],
     });
   }
 

@@ -23,10 +23,6 @@ export class UsuarioRepository {
     return this.repo.find();
   }
 
-  async findByRol(rol: string): Promise<Usuario[]> {
-    return this.repo.find({ where: { rol: rol as any } });
-  }
-
   async update(discordId: string, data: Partial<Usuario>): Promise<Usuario | null> {
     await this.repo.update(discordId, data);
     return this.findByDiscordId(discordId);

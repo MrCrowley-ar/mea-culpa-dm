@@ -35,7 +35,7 @@ export class ExpedicionesController {
   ): Promise<ExpedicionResponseDto> {
     const expedicion = await this.expedicionesService.create(
       req.user.discord_id,
-      req.user.rol,
+      req.user.roles,
       { fecha: dto.fecha ? new Date(dto.fecha) : undefined, notas: dto.notas },
     );
     return ExpedicionResponseDto.fromEntity(expedicion);
@@ -79,7 +79,7 @@ export class ExpedicionesController {
     const p = await this.expedicionesService.addParticipacion({
       expedicion_id: id,
       usuario_id: dto.usuario_id,
-      nombre_personaje: dto.nombre_personaje,
+      personaje_id: dto.personaje_id,
     });
     return ParticipacionResponseDto.fromEntity(p);
   }

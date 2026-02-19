@@ -7,7 +7,10 @@ import {
 import { UsuarioRepository } from './repositories/usuario.repository';
 import { RefreshTokenRepository } from './repositories/refresh-token.repository';
 import { AllowedDiscordIdRepository } from './repositories/allowed-discord-id.repository';
+import { UsuarioRolRepository } from './repositories/usuario-rol.repository';
+import { PersonajeRepository } from './repositories/personaje.repository';
 import { Usuario } from './entities/usuario.entity';
+import { Personaje } from './entities/personaje.entity';
 import { RolUsuario } from '../common/enums';
 
 @Injectable()
@@ -16,6 +19,8 @@ export class UsuariosService {
     private readonly usuarioRepo: UsuarioRepository,
     private readonly refreshTokenRepo: RefreshTokenRepository,
     private readonly allowedDiscordIdRepo: AllowedDiscordIdRepository,
+    private readonly usuarioRolRepo: UsuarioRolRepository,
+    private readonly personajeRepo: PersonajeRepository,
   ) {}
 
   async findByDiscordId(discordId: string): Promise<Usuario> {
@@ -62,22 +67,80 @@ export class UsuariosService {
     return updated!;
   }
 
+  // --- Roles ---
+
+  async addRol(discordId: string, rol: RolUsuario): Promise<void> {
+    const hasRol = await this.usuarioRolRepo.hasRol(discordId, rol);
+    if (!hasRol) {
+      await this.usuarioRolRepo.addRol(discordId, rol);
+    }
+  }
+
+  async getRoles(discordId: string): Promise<string[]> {
+    const usuario = await this.findByDiscordId(discordId);
+    return usuario.rolNames;
+  }
+
+  // --- Jugadores ---
+
   async createJugador(discordId: string, nombre: string): Promise<Usuario> {
     const existing = await this.usuarioRepo.findByDiscordId(discordId);
     if (existing) {
       throw new ConflictServiceException('El Discord ID ya está registrado');
     }
-    return this.usuarioRepo.create({
+    const usuario = await this.usuarioRepo.create({
       discord_id: discordId,
       nombre,
       password_hash: null,
-      rol: RolUsuario.PLAYER,
     });
+    await this.usuarioRolRepo.addRol(discordId, RolUsuario.PLAYER);
+    // Re-fetch to get roles loaded
+    return this.findByDiscordId(discordId);
   }
 
   async findJugadores(): Promise<Usuario[]> {
-    return this.usuarioRepo.findByRol(RolUsuario.PLAYER);
+    const ids = await this.usuarioRolRepo.findUsuarioIdsByRol(RolUsuario.PLAYER);
+    if (ids.length === 0) return [];
+    const all = await this.usuarioRepo.findAll();
+    return all.filter((u) => ids.includes(u.discord_id));
   }
+
+  // --- Personajes ---
+
+  async getPersonajes(discordId: string): Promise<Personaje[]> {
+    await this.findByDiscordId(discordId);
+    return this.personajeRepo.findByUsuarioId(discordId);
+  }
+
+  async getPersonaje(id: number): Promise<Personaje> {
+    const personaje = await this.personajeRepo.findById(id);
+    if (!personaje) {
+      throw new NotFoundServiceException(
+        `Personaje con ID ${id} no encontrado`,
+      );
+    }
+    return personaje;
+  }
+
+  async createPersonaje(discordId: string, nombre: string): Promise<Personaje> {
+    await this.findByDiscordId(discordId);
+    return this.personajeRepo.create({
+      usuario_id: discordId,
+      nombre,
+    });
+  }
+
+  async deletePersonaje(id: number): Promise<void> {
+    const personaje = await this.personajeRepo.findById(id);
+    if (!personaje) {
+      throw new NotFoundServiceException(
+        `Personaje con ID ${id} no encontrado`,
+      );
+    }
+    await this.personajeRepo.delete(id);
+  }
+
+  // --- Allowed Discord IDs ---
 
   async addAllowedDiscordId(discordId: string, nota?: string): Promise<void> {
     const existing = await this.allowedDiscordIdRepo.findById(discordId);
@@ -106,6 +169,8 @@ export class UsuariosService {
   async findAll(): Promise<Usuario[]> {
     return this.usuarioRepo.findAll();
   }
+
+  // --- Refresh Tokens ---
 
   async saveRefreshToken(
     usuarioId: string,

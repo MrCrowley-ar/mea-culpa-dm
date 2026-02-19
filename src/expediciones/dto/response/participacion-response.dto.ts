@@ -5,6 +5,7 @@ export class ParticipacionResponseDto {
   expedicion_id: number;
   usuario_id: string;
   usuario_nombre: string | null;
+  personaje_id: number;
   nombre_personaje: string;
   oro_acumulado: number;
   activo: boolean;
@@ -17,7 +18,8 @@ export class ParticipacionResponseDto {
     dto.expedicion_id = entity.expedicion_id;
     dto.usuario_id = entity.usuario_id;
     dto.usuario_nombre = entity.usuario?.nombre ?? null;
-    dto.nombre_personaje = entity.nombre_personaje;
+    dto.personaje_id = entity.personaje_id;
+    dto.nombre_personaje = entity.personaje?.nombre ?? '';
     dto.oro_acumulado = entity.oro_acumulado;
     dto.activo = entity.activo;
     dto.sala_salida = entity.sala_salida ?? null;

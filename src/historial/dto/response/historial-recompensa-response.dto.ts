@@ -23,7 +23,7 @@ export class HistorialRecompensaResponseDto {
     dto.historial_habitacion_id = entity.historial_habitacion_id;
     dto.participacion_id = entity.participacion_id;
     dto.participacion_personaje =
-      entity.participacion?.nombre_personaje ?? null;
+      entity.participacion?.personaje?.nombre ?? null;
     dto.tirada_original = entity.tirada_original;
     dto.tirada_subtabla = entity.tirada_subtabla;
     dto.item_id = entity.item_id;

@@ -18,13 +18,19 @@ Los **jugadores** participan via Discord. Solo el DM interactua con la web.
 
 ## 2. Roles y Autenticacion
 
-### Roles del sistema
+### Roles del sistema (multi-rol)
 
-| Rol | Quien es | Tiene password | Acceso web |
-|-----|----------|:--------------:|------------|
-| `player` | Jugador agregado por un DM | No | No puede loguearse. Solo existe como registro para participaciones |
-| `dm` | Dungeon Master registrado | Si | Acceso completo a crear/gestionar expediciones, gameplay y jugadores |
-| `admin` | Administrador del sistema | Si | Todo lo del DM + gestionar items, promover jugadores a DM, manejar whitelist |
+Un usuario puede tener **multiples roles simultaneamente**. Los roles son acumulativos.
+
+| Rol | Quien es | Se puede loguear | Que puede hacer |
+|-----|----------|:----------------:|-----------------|
+| `player` | Jugador registrado por un DM | No (no tiene password) | Participar en expediciones con sus personajes |
+| `dm` | Dungeon Master | Si | Crear/gestionar expediciones, gameplay, agregar jugadores |
+| `admin` | Administrador | Si | Todo lo del DM + CRUD items, promover a DM, whitelist |
+
+> **Multi-rol:** Un usuario puede ser `player` + `dm` a la vez. Si un jugador es promovido a DM,
+> conserva su rol `player` y se le agrega `dm`. Un admin tambien puede ser `player` + `dm` + `admin`.
+> El JWT contiene `roles: string[]` (array, no string singular).
 
 ### Flujo de registro (solo DMs)
 
@@ -37,7 +43,7 @@ Los **jugadores** participan via Discord. Solo el DM interactua con la web.
 **Caso especial - jugador promovido a DM:**
 - Si el usuario ya existia como `player` (sin password, agregado por otro DM)
 - Y un ADMIN agrego su `discord_id` a la whitelist
-- Al registrarse, su cuenta se actualiza: se le asigna password y rol `DM`
+- Al registrarse, su cuenta se actualiza: se le asigna password y se le agrega el rol `DM` (conserva `player`)
 
 ### Flujo de login
 
@@ -62,7 +68,7 @@ Los **jugadores** participan via Discord. Solo el DM interactua con la web.
 1. Un ADMIN usa `POST /api/usuarios/promover-dm` con el `discord_id` del jugador
 2. Esto agrega su ID a la whitelist (`allowed_discord_ids`)
 3. El jugador ahora puede registrarse en la web (`POST /auth/register`)
-4. Al registrarse, configura su password y su cuenta se actualiza a rol `DM`
+4. Al registrarse, configura su password y se le agrega el rol `DM` (conserva rol `player`)
 
 ---
 
@@ -335,12 +341,33 @@ Esta es la pantalla principal de juego. Debe mostrar:
 ```
 discord_id: string (PK, el ID de Discord)
 nombre: string
-rol: "player" | "dm" | "admin"
 password_hash: string | null (null para players, tiene valor para DMs/ADMINs)
+roles: string[] (array de roles: "player", "dm", "admin" - un usuario puede tener varios)
 created_at: Date
 ```
 
-> **Nota:** Los players NO tienen password. Solo DMs y ADMINs pueden loguearse.
+> **Nota:** Los roles se almacenan en tabla separada `usuario_roles` (many-to-many).
+> El response de la API devuelve `roles: ["player", "dm"]` como array.
+> Los players NO tienen password. Solo DMs y ADMINs pueden loguearse.
+
+#### UsuarioRol (tabla intermedia)
+```
+id: number (PK, auto)
+usuario_id: string (FK → Usuario.discord_id)
+rol: "player" | "dm" | "admin"
+UNIQUE(usuario_id, rol)
+```
+
+#### Personaje (personajes de cada jugador)
+```
+id: number (PK, auto)
+usuario_id: string (FK → Usuario.discord_id)
+nombre: string (ej: "Aldric el Guerrero")
+created_at: Date
+```
+
+> **Nota:** Cada jugador puede tener multiples personajes. Al crear una participacion
+> en una expedicion, se elige un personaje_id especifico (no se escribe el nombre a mano).
 
 #### AllowedDiscordId (whitelist de IDs autorizados para registrarse)
 ```
@@ -366,7 +393,7 @@ updated_at: Date
 id: number (PK, auto)
 expedicion_id: number (FK → Expedicion)
 usuario_id: string (FK → Usuario.discord_id)
-nombre_personaje: string (ej: "Aldric el Guerrero")
+personaje_id: number (FK → Personaje.id)
 oro_acumulado: number (se actualiza al liquidar)
 activo: boolean (true = participa, false = se fue)
 sala_salida: number | null (en que sala se fue, null si sigue activo)
@@ -374,6 +401,8 @@ created_at: Date
 ```
 
 > **Constraint:** Un usuario solo puede participar UNA vez por expedicion (unique: expedicion_id + usuario_id)
+> **Nota:** Al agregar participante ahora se envia `personaje_id` en vez de `nombre_personaje`.
+> El response incluye `nombre_personaje` (extraido de la relacion con Personaje).
 
 #### Piso (precargado en DB, 20 registros)
 ```
@@ -571,6 +600,13 @@ oro_total = sum(oro_bruto de todas las salas) + sum(precio_venta de items vendid
 | GET | `/usuarios/allowed` | Listar whitelist de IDs permitidos | ADMIN |
 | DELETE | `/usuarios/allowed/:discordId` | Eliminar de whitelist | ADMIN |
 
+### Personajes
+| Metodo | Ruta | Que hace | Rol requerido |
+|--------|------|----------|---------------|
+| GET | `/usuarios/:discordId/personajes` | Listar personajes de un usuario | DM, ADMIN |
+| POST | `/usuarios/:discordId/personajes` | Crear personaje para un usuario | DM, ADMIN |
+| DELETE | `/usuarios/personajes/:personajeId` | Eliminar personaje | DM, ADMIN |
+
 ### Expediciones
 | Metodo | Ruta | Que hace |
 |--------|------|----------|
@@ -766,7 +802,7 @@ Formato estandar de error:
 ### Estado global sugerido
 
 ```
-- usuario: { discord_id, nombre, rol, tokens }
+- usuario: { discord_id, nombre, roles[], tokens }
 - expedicionActual: { id, estado, piso_actual, participantes[] }
 - pisoActual: { numero, habitaciones[], participantesActivos[] }
 - salaActual: { id, tipo, encuentro, recompensas, completada }
@@ -827,15 +863,15 @@ El ADMIN tiene todo lo del DM mas:
 ### Implementacion sugerida en el front
 
 ```
-1. Al hacer login, guardar el `rol` del JWT payload (o del response)
-2. Usar el rol para:
-   - Mostrar/ocultar el menu de admin
-   - Habilitar/deshabilitar botones de CRUD de items
-   - Mostrar/ocultar el boton "Promover a DM"
-   - Mostrar/ocultar la gestion de whitelist
+1. Al hacer login, guardar `roles[]` del JWT payload
+2. Usar los roles para:
+   - Mostrar/ocultar el menu de admin → roles.includes('admin')
+   - Habilitar/deshabilitar botones de CRUD de items → roles.includes('admin')
+   - Mostrar/ocultar el boton "Promover a DM" → roles.includes('admin')
+   - Mostrar/ocultar la gestion de whitelist → roles.includes('admin')
 3. Rutas protegidas:
-   - /admin/* → solo si rol === 'admin'
-   - /expediciones/* → si rol === 'dm' || rol === 'admin'
+   - /admin/* → solo si roles.includes('admin')
+   - /expediciones/* → si roles.includes('dm') || roles.includes('admin')
    - /login, /register → publico
 ```
 
@@ -870,8 +906,32 @@ Respuesta:
 {
   "discord_id": "123456789012345678",
   "nombre": "NombreJugador",
-  "rol": "player",
+  "roles": ["player"],
   "created_at": "2025-01-01T00:00:00.000Z"
+}
+```
+
+**POST `/api/usuarios/:discordId/personajes`** (DM/ADMIN)
+```json
+{
+  "nombre": "Aldric el Guerrero"
+}
+```
+Respuesta:
+```json
+{
+  "id": 1,
+  "usuario_id": "123456789012345678",
+  "nombre": "Aldric el Guerrero",
+  "created_at": "2025-01-01T00:00:00.000Z"
+}
+```
+
+**POST `/api/expediciones/:id/participaciones`** (DM/ADMIN)
+```json
+{
+  "usuario_id": "123456789012345678",
+  "personaje_id": 1
 }
 ```
 

@@ -571,7 +571,7 @@ export class GameplayService {
   async repartirOroHabitacion(
     historialHabitacionId: number,
     oroTotal: number,
-  ): Promise<{ repartos: { participacion_id: number; nombre_personaje: string; oro: number }[] }> {
+  ): Promise<{ repartos: { participacion_id: number; nombre_personaje: string; oro: number }[] }> {  // nombre_personaje from personaje relation
     const habitacion = await this.historialService.getHistorialHabitacion(historialHabitacionId);
 
     if (habitacion.completada) {
@@ -594,7 +594,7 @@ export class GameplayService {
         const p = participacionesActivas.find((p) => p.id === r.participacion_id);
         return {
           participacion_id: r.participacion_id,
-          nombre_personaje: p?.nombre_personaje ?? '',
+          nombre_personaje: p?.personaje?.nombre ?? '',
           oro: r.oro,
         };
       }),
@@ -716,7 +716,7 @@ export class GameplayService {
 
       return {
         participacion_id: p.id,
-        nombre_personaje: p.nombre_personaje,
+        nombre_personaje: p.personaje?.nombre ?? '',
         usuario_id: p.usuario_id,
         items,
         total_oro_bruto: totalOroBruto,

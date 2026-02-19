@@ -30,22 +30,24 @@ export class AuthService {
       if (existing.password_hash) {
         throw new ConflictServiceException('Este Discord ID ya está registrado como DM');
       }
-      const usuario = await this.usuariosService.update(dto.discord_id, {
+      await this.usuariosService.update(dto.discord_id, {
         nombre: dto.nombre,
         password_hash: passwordHash,
-        rol: RolUsuario.DM,
       });
-      return this.generateTokens(usuario.discord_id, usuario.rol);
+      await this.usuariosService.addRol(dto.discord_id, RolUsuario.DM);
+      const usuario = await this.usuariosService.findByDiscordId(dto.discord_id);
+      return this.generateTokens(usuario.discord_id, usuario.rolNames);
     }
 
-    const usuario = await this.usuariosService.create({
+    await this.usuariosService.create({
       discord_id: dto.discord_id,
       nombre: dto.nombre,
       password_hash: passwordHash,
-      rol: RolUsuario.DM,
     });
+    await this.usuariosService.addRol(dto.discord_id, RolUsuario.DM);
+    const usuario = await this.usuariosService.findByDiscordId(dto.discord_id);
 
-    return this.generateTokens(usuario.discord_id, usuario.rol);
+    return this.generateTokens(usuario.discord_id, usuario.rolNames);
   }
 
   async login(dto: LoginDto) {
@@ -64,7 +66,7 @@ export class AuthService {
       throw new ForbiddenServiceException('Credenciales inválidas');
     }
 
-    return this.generateTokens(usuario.discord_id, usuario.rol);
+    return this.generateTokens(usuario.discord_id, usuario.rolNames);
   }
 
   async refreshToken(refreshToken: string) {
@@ -77,17 +79,17 @@ export class AuthService {
     }
 
     await this.usuariosService.deleteRefreshToken(refreshToken);
-    return this.generateTokens(
+    const usuario = await this.usuariosService.findByDiscordId(
       stored.usuario.discord_id,
-      stored.usuario.rol,
     );
+    return this.generateTokens(usuario.discord_id, usuario.rolNames);
   }
 
   private async generateTokens(
     discordId: string,
-    rol: string,
+    roles: string[],
   ) {
-    const payload = { sub: discordId, rol };
+    const payload = { sub: discordId, roles };
 
     const accessToken = this.jwtService.sign(payload);
 

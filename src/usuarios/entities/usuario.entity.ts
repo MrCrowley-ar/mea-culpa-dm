@@ -5,10 +5,11 @@ import {
   CreateDateColumn,
   OneToMany,
 } from 'typeorm';
-import { RolUsuario } from '../../common/enums';
 import { Expedicion } from '../../expediciones/entities/expedicion.entity';
 import { Participacion } from '../../expediciones/entities/participacion.entity';
 import { RefreshToken } from './refresh-token.entity';
+import { UsuarioRol } from './usuario-rol.entity';
+import { Personaje } from './personaje.entity';
 
 @Entity({ name: 'usuarios', schema: 'expediciones' })
 export class Usuario {
@@ -21,11 +22,14 @@ export class Usuario {
   @Column({ type: 'varchar', length: 255, nullable: true })
   password_hash: string | null;
 
-  @Column({ type: 'enum', enum: RolUsuario, default: RolUsuario.PLAYER })
-  rol: RolUsuario;
-
   @CreateDateColumn()
   created_at: Date;
+
+  @OneToMany(() => UsuarioRol, (ur) => ur.usuario, { eager: true })
+  roles: UsuarioRol[];
+
+  @OneToMany(() => Personaje, (p) => p.usuario)
+  personajes: Personaje[];
 
   @OneToMany(() => Expedicion, (e) => e.organizador)
   expediciones_organizadas: Expedicion[];
@@ -35,4 +39,8 @@ export class Usuario {
 
   @OneToMany(() => RefreshToken, (rt) => rt.usuario)
   refresh_tokens: RefreshToken[];
+
+  get rolNames(): string[] {
+    return this.roles?.map((r) => r.rol) ?? [];
+  }
 }
