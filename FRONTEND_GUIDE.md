@@ -503,15 +503,62 @@ Esto es lo que pasa cuando el DM tira 1d20 para una recompensa:
 
 ### Subtablas disponibles
 
-| Subtabla | Varia por piso | Varia por habitacion | Aplica mod tier |
-|----------|:--------------:|:--------------------:|:--------------:|
-| `armas` | No | No | Si (+armas) |
-| `armaduras` | No | No | Si (+armaduras) |
-| `objetos_curiosos` | Si | Si | No |
-| `items_boss` | Si | No | No |
-| `pociones` | Opcional | No | No |
-| `tesoro_menor` | Opcional | No | No |
-| `critico` | Opcional | No | No |
+| Subtabla | Varia por piso | Varia por habitacion | Aplica mod tier | Tirada subtabla |
+|----------|:--------------:|:--------------------:|:--------------:|:---------------:|
+| `armas` | No | No | Si (+armas) | Si (d20) |
+| `armaduras` | No | No | Si (+armaduras) | Si (d20) |
+| `objetos_curiosos` | Si | Si | No | Si (d20) |
+| `items_boss` | Si | No | No | Si (d20) |
+| `pociones` | Opcional | No | No | Si (d20) |
+| `tesoro_menor` | Opcional | No | No | Si (d20) |
+| `critico` | Opcional | No | No | Si (d20) |
+| `especial` | Si (por tier) | No | No | **No** (al azar) |
+| `botin_alternativo` | Si | Si | No | Si (d20) |
+
+### Subtabla `especial` (seleccion al azar)
+
+Algunas entradas de recompensa apuntan a `subtabla_nombre = 'especial'`. Estas NO requieren
+una segunda tirada. En vez de eso, el sistema **elige un item al azar** de una lista de opciones
+vinculadas a esa entrada.
+
+**Como funciona:**
+
+1. La tirada principal cae en una fila con `subtabla_nombre = 'especial'`
+2. El sistema busca en la tabla `opciones_especiales` todas las opciones para esa entrada
+3. Elige una al azar
+4. Devuelve el **item real** (con `item_id` y `item_nombre`) directamente
+
+**Ejemplo:** Si cae en "Equipo raro 1d4: Pergamino/Mapa/Gemas/Repite", el sistema tiene
+3 opciones registradas (Pergamino, Mapa del dungeon, Gemas varias) y elige una al azar.
+
+> **Para el front:** Cuando `subtabla_nombre = 'especial'`, NO se necesita segunda tirada.
+> El endpoint devuelve el item directamente. El campo `requiere_subtabla` sera `false`.
+> El front puede mostrar el resultado inmediatamente sin pedir tirada adicional.
+
+**Opciones especiales por tier:**
+
+| Tier 1 (Pisos 1-4) | Items posibles |
+|---------------------|----------------|
+| Tirada 17: Pocion de fortuna | Pocion de fortuna |
+| Tirada 18: Saco de raciones | Saco de raciones |
+| Tirada 19: Equipo raro | Pergamino viejo / Mapa del dungeon / Gemas varias |
+| Tirada 20: Objeto magico menor | Piedra luminosa / Anillo +1 (menor) / Amuleto chispa (menor) |
+
+| Tier 2 (Pisos 5-7) | Items posibles |
+|---------------------|----------------|
+| Tirada 16: Aleacion Tier 1 | Aleacion Tier 1 |
+| Tirada 17: Ventaja dungeon | Mapa del dungeon / Pergamino viejo / Obsidiana Roja |
+| Tirada 18: Racion magica grupal | Racion magica grupal |
+| Tirada 19: Bomba | Bomba |
+
+### Subtabla `botin_alternativo`
+
+Cuando `subtabla_nombre = 'botin_alternativo'`, el sistema busca en la tabla `objetos_curiosos`
+(la misma que usa `objetos_curiosos`). Funciona igual: requiere una segunda tirada (d20)
+y devuelve un item de la tabla de objetos curiosos para ese piso y tipo de habitacion.
+
+> **Para el front:** Tratar `botin_alternativo` igual que cualquier otra subtabla que requiere
+> segunda tirada. El campo `requiere_subtabla` sera `true` si no se provee la tirada de subtabla.
 
 ---
 
