@@ -124,6 +124,11 @@ export class GameplayService {
       );
     }
 
+    // 'especial' se resuelve al azar sin tirada de subtabla
+    if (subtablaNombre.toLowerCase().trim() === 'especial') {
+      return this.resolverEspecial(recompensa.id, baseParams, recompensa.descripcion);
+    }
+
     // Si no hay tirada de subtabla, indicar que se requiere
     if (tiradaSubtabla === undefined || tiradaSubtabla === null) {
       return RecompensaResueltaDto.subtablaPendiente({
@@ -177,6 +182,10 @@ export class GameplayService {
         return this.resolverSubtablaTesoroMenor(tiradaSubtabla, piso, baseParams, descripcion);
       case 'critico':
         return this.resolverSubtablaCritico(tiradaSubtabla, piso, baseParams, descripcion);
+      case 'botin_alternativo':
+        return this.resolverSubtablaObjetosCuriosos(
+          tiradaSubtabla, piso, tipoHabitacionId, baseParams, descripcion,
+        );
       default:
         throw new NotFoundServiceException(
           `Subtabla desconocida: "${subtablaNombre}"`,
@@ -346,6 +355,37 @@ export class GameplayService {
     });
   }
 
+  private async resolverEspecial(
+    tablaRecompensaId: number,
+    baseParams: any,
+    descripcion?: string,
+  ): Promise<RecompensaResueltaDto> {
+    const opciones = await this.recompensasService.getOpcionesByRecompensaId(tablaRecompensaId);
+
+    if (opciones.length === 0) {
+      // Sin opciones estructuradas, devolver la descripción tal cual
+      return RecompensaResueltaDto.subtablaResuelta({
+        ...baseParams,
+        subtabla_nombre: 'especial',
+        tirada_subtabla: 0,
+        item_nombre: descripcion,
+        descripcion,
+      });
+    }
+
+    // Elegir una opción al azar
+    const indice = Math.floor(Math.random() * opciones.length);
+    const elegida = opciones[indice];
+
+    return RecompensaResueltaDto.subtablaResuelta({
+      ...baseParams,
+      subtabla_nombre: 'especial',
+      tirada_subtabla: 0,
+      item_nombre: elegida.nombre,
+      descripcion,
+    });
+  }
+
   // =========================================================================
   // FLUJO INTEGRADO POR SALA
   // =========================================================================
@@ -506,7 +546,7 @@ export class GameplayService {
       );
       resultados.push(resultado);
 
-      if (resultado.tipo_resultado === 'subtabla' && !resultado.requiere_subtabla && resultado.item_id) {
+      if (resultado.tipo_resultado === 'subtabla' && !resultado.requiere_subtabla && (resultado.item_id || resultado.subtabla_nombre === 'especial')) {
         itemsPendientes.push({
           indice: i,
           tirada_d20: t.tirada_d20,

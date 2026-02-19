@@ -8,6 +8,7 @@ import { TablaArmaduraRepository } from './repositories/tabla-armadura.repositor
 import { TablaPocionRepository } from './repositories/tabla-pocion.repository';
 import { TablaTesroMenorRepository } from './repositories/tabla-tesoro-menor.repository';
 import { TablaCriticoRepository } from './repositories/tabla-critico.repository';
+import { OpcionEspecialRepository } from './repositories/opcion-especial.repository';
 import { TablaRecompensa } from './entities/tabla-recompensa.entity';
 import { TablaObjetosCuriosos } from './entities/tabla-objetos-curiosos.entity';
 import { TablaItemsBoss } from './entities/tabla-items-boss.entity';
@@ -16,6 +17,7 @@ import { TablaArmadura } from './entities/tabla-armadura.entity';
 import { TablaPocion } from './entities/tabla-pocion.entity';
 import { TablaTesroMenor } from './entities/tabla-tesoro-menor.entity';
 import { TablaCritico } from './entities/tabla-critico.entity';
+import { OpcionEspecial } from './entities/opcion-especial.entity';
 
 @Injectable()
 export class RecompensasService {
@@ -28,6 +30,7 @@ export class RecompensasService {
     private readonly tablaPocionRepo: TablaPocionRepository,
     private readonly tablaTesroMenorRepo: TablaTesroMenorRepository,
     private readonly tablaCriticoRepo: TablaCriticoRepository,
+    private readonly opcionEspecialRepo: OpcionEspecialRepository,
   ) {}
 
   // --- Lookup por tirada (usado por GameplayService) ---
@@ -170,5 +173,19 @@ export class RecompensasService {
   }
   async deleteTablaCritico(id: number): Promise<void> {
     await this.tablaCriticoRepo.delete(id);
+  }
+
+  // --- Opciones Especiales ---
+  async getOpcionesEspeciales(): Promise<OpcionEspecial[]> {
+    return this.opcionEspecialRepo.findAll();
+  }
+  async getOpcionesByRecompensaId(tablaRecompensaId: number): Promise<OpcionEspecial[]> {
+    return this.opcionEspecialRepo.findByTablaRecompensaId(tablaRecompensaId);
+  }
+  async createOpcionEspecial(data: Partial<OpcionEspecial>): Promise<OpcionEspecial> {
+    return this.opcionEspecialRepo.create(data);
+  }
+  async deleteOpcionEspecial(id: number): Promise<void> {
+    await this.opcionEspecialRepo.delete(id);
   }
 }

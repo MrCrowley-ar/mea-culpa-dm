@@ -9,6 +9,7 @@ import { TablaPocion } from './entities/tabla-pocion.entity';
 import { TablaTesroMenor } from './entities/tabla-tesoro-menor.entity';
 import { TablaCritico } from './entities/tabla-critico.entity';
 import { TablaEventoBonus } from './entities/tabla-evento-bonus.entity';
+import { OpcionEspecial } from './entities/opcion-especial.entity';
 import { TablaRecompensaRepository } from './repositories/tabla-recompensa.repository';
 import { TablaObjetosCuriososRepository } from './repositories/tabla-objetos-curiosos.repository';
 import { TablaItemsBossRepository } from './repositories/tabla-items-boss.repository';
@@ -17,6 +18,7 @@ import { TablaArmaduraRepository } from './repositories/tabla-armadura.repositor
 import { TablaPocionRepository } from './repositories/tabla-pocion.repository';
 import { TablaTesroMenorRepository } from './repositories/tabla-tesoro-menor.repository';
 import { TablaCriticoRepository } from './repositories/tabla-critico.repository';
+import { OpcionEspecialRepository } from './repositories/opcion-especial.repository';
 import { RecompensasService } from './recompensas.service';
 import { RecompensasController } from './recompensas.controller';
 
@@ -32,6 +34,7 @@ import { RecompensasController } from './recompensas.controller';
       TablaTesroMenor,
       TablaCritico,
       TablaEventoBonus,
+      OpcionEspecial,
     ]),
   ],
   providers: [
@@ -43,6 +46,7 @@ import { RecompensasController } from './recompensas.controller';
     TablaPocionRepository,
     TablaTesroMenorRepository,
     TablaCriticoRepository,
+    OpcionEspecialRepository,
     RecompensasService,
   ],
   controllers: [RecompensasController],
