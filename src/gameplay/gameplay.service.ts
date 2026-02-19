@@ -363,14 +363,9 @@ export class GameplayService {
     const opciones = await this.recompensasService.getOpcionesByRecompensaId(tablaRecompensaId);
 
     if (opciones.length === 0) {
-      // Sin opciones estructuradas, devolver la descripción tal cual
-      return RecompensaResueltaDto.subtablaResuelta({
-        ...baseParams,
-        subtabla_nombre: 'especial',
-        tirada_subtabla: 0,
-        item_nombre: descripcion,
-        descripcion,
-      });
+      throw new NotFoundServiceException(
+        `No se encontraron opciones especiales para tabla_recompensa_id ${tablaRecompensaId}`,
+      );
     }
 
     // Elegir una opción al azar
@@ -381,7 +376,8 @@ export class GameplayService {
       ...baseParams,
       subtabla_nombre: 'especial',
       tirada_subtabla: 0,
-      item_nombre: elegida.nombre,
+      item_nombre: elegida.item?.nombre,
+      item_id: elegida.item_id,
       descripcion,
     });
   }

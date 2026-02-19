@@ -12,7 +12,7 @@ export class OpcionEspecialRepository {
 
   async findAll(): Promise<OpcionEspecial[]> {
     return this.repo.find({
-      relations: ['tabla_recompensa'],
+      relations: ['tabla_recompensa', 'item'],
     });
   }
 
@@ -21,6 +21,7 @@ export class OpcionEspecialRepository {
   ): Promise<OpcionEspecial[]> {
     return this.repo.find({
       where: { tabla_recompensa_id: tablaRecompensaId },
+      relations: ['item'],
     });
   }
 
