@@ -34,10 +34,31 @@ export class TablaObjetosCuriososRepository {
     tipoHabitacionId: number,
     tirada: number,
   ): Promise<TablaObjetosCuriosos | null> {
-    return this.repo.findOne({
+    // Buscar primero con piso y tipo de habitación específicos
+    const especifico = await this.repo.findOne({
       where: { piso_numero: pisoNumero, tipo_habitacion_id: tipoHabitacionId, tirada },
       relations: ['item'],
     });
+    if (especifico) return especifico;
+
+    // Fallback: buscar con piso específico y habitación NULL
+    const porPiso = await this.repo
+      .createQueryBuilder('oc')
+      .leftJoinAndSelect('oc.item', 'item')
+      .where('oc.piso_numero = :pisoNumero', { pisoNumero })
+      .andWhere('oc.tipo_habitacion_id IS NULL')
+      .andWhere('oc.tirada = :tirada', { tirada })
+      .getOne();
+    if (porPiso) return porPiso;
+
+    // Fallback: buscar genérico (piso NULL y habitación NULL)
+    return this.repo
+      .createQueryBuilder('oc')
+      .leftJoinAndSelect('oc.item', 'item')
+      .where('oc.piso_numero IS NULL')
+      .andWhere('oc.tipo_habitacion_id IS NULL')
+      .andWhere('oc.tirada = :tirada', { tirada })
+      .getOne();
   }
 
   async create(data: Partial<TablaObjetosCuriosos>): Promise<TablaObjetosCuriosos> {
