@@ -129,11 +129,16 @@ export class GameplayService {
       return this.resolverEspecial(recompensa.id, baseParams, recompensa.descripcion);
     }
 
+    // Normalizar nombre de subtabla para el front
+    const subtablaNombrePublico = subtablaNombre === 'botin_alternativo'
+      ? 'objetos_curiosos'
+      : subtablaNombre;
+
     // Si no hay tirada de subtabla, indicar que se requiere
     if (tiradaSubtabla === undefined || tiradaSubtabla === null) {
       return RecompensaResueltaDto.subtablaPendiente({
         ...baseParams,
-        subtabla_nombre: subtablaNombre,
+        subtabla_nombre: subtablaNombrePublico,
         descripcion: recompensa.descripcion,
       });
     }
