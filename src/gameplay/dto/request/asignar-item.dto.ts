@@ -15,7 +15,7 @@ export class AsignarItemDto {
   tirada_original: number;
 
   @IsInt()
-  @Min(1)
+  @Min(0)
   @Max(20)
   @IsOptional()
   tirada_subtabla?: number;

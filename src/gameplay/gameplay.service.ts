@@ -585,7 +585,7 @@ export class GameplayService {
       historial_habitacion_id: historialHabitacionId,
       participacion_id: participacionId,
       tirada_original: tiradaOriginal,
-      tirada_subtabla: tiradaSubtabla ?? undefined,
+      tirada_subtabla: tiradaSubtabla || undefined,
       item_id: itemId,
       modificador_tier: modificadorTier ?? 0,
       oro_obtenido: 0,
