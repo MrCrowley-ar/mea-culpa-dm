@@ -86,7 +86,14 @@ export class UsuariosService {
   async createJugador(discordId: string, nombre: string): Promise<Usuario> {
     const existing = await this.usuarioRepo.findByDiscordId(discordId);
     if (existing) {
-      throw new ConflictServiceException('El Discord ID ya está registrado');
+      // Si ya existe, verificar si ya tiene rol player
+      const isPlayer = await this.usuarioRolRepo.hasRol(discordId, RolUsuario.PLAYER);
+      if (isPlayer) {
+        throw new ConflictServiceException('Este usuario ya es un jugador registrado');
+      }
+      // El usuario existe (ej: como DM) pero no tiene rol player → agregarlo
+      await this.usuarioRolRepo.addRol(discordId, RolUsuario.PLAYER);
+      return this.findByDiscordId(discordId);
     }
     const usuario = await this.usuarioRepo.create({
       discord_id: discordId,
