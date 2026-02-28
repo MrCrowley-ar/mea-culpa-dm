@@ -117,4 +117,25 @@ export class ExpedicionesService {
     }
     await this.participacionRepo.updateActivo(participacionId, true, null);
   }
+
+  async saveSnapshot(
+    id: number,
+    snapshot: Record<string, any>,
+  ): Promise<Expedicion> {
+    await this.findOne(id);
+    const updated = await this.expedicionRepo.update(id, {
+      estado_snapshot: snapshot,
+    });
+    if (!updated) {
+      throw new NotFoundServiceException(
+        `Expedición con ID ${id} no encontrada`,
+      );
+    }
+    return updated;
+  }
+
+  async getSnapshot(id: number): Promise<Record<string, any> | null> {
+    const expedicion = await this.findOne(id);
+    return expedicion.estado_snapshot ?? null;
+  }
 }

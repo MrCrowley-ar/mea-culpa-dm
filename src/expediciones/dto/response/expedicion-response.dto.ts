@@ -8,6 +8,7 @@ export class ExpedicionResponseDto {
   estado: string;
   piso_actual: number;
   notas: string | null;
+  tiene_snapshot: boolean;
   created_at: Date;
   updated_at: Date;
 
@@ -20,6 +21,7 @@ export class ExpedicionResponseDto {
     dto.estado = entity.estado;
     dto.piso_actual = entity.piso_actual;
     dto.notas = entity.notas;
+    dto.tiene_snapshot = entity.estado_snapshot != null;
     dto.created_at = entity.created_at;
     dto.updated_at = entity.updated_at;
     return dto;

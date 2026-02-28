@@ -19,6 +19,7 @@ import { CreateExpedicionDto } from './dto/request/create-expedicion.dto';
 import { UpdateExpedicionDto } from './dto/request/update-expedicion.dto';
 import { CreateParticipacionDto } from './dto/request/create-participacion.dto';
 import { DesactivarParticipacionDto } from './dto/request/desactivar-participacion.dto';
+import { SaveEstadoSnapshotDto } from './dto/request/save-estado-snapshot.dto';
 import { ExpedicionResponseDto } from './dto/response/expedicion-response.dto';
 import { ParticipacionResponseDto } from './dto/response/participacion-response.dto';
 
@@ -67,6 +68,28 @@ export class ExpedicionesController {
   @Delete(':id')
   async delete(@Param('id', ParseIntPipe) id: number): Promise<void> {
     await this.expedicionesService.delete(id);
+  }
+
+  // --- Estado Snapshot ---
+
+  @Put(':id/snapshot')
+  async saveSnapshot(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: SaveEstadoSnapshotDto,
+  ): Promise<{ expedicion_id: number; updated_at: Date }> {
+    const expedicion = await this.expedicionesService.saveSnapshot(
+      id,
+      dto.estado_snapshot,
+    );
+    return { expedicion_id: expedicion.id, updated_at: expedicion.updated_at };
+  }
+
+  @Get(':id/snapshot')
+  async getSnapshot(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<{ expedicion_id: number; estado_snapshot: Record<string, any> | null }> {
+    const snapshot = await this.expedicionesService.getSnapshot(id);
+    return { expedicion_id: id, estado_snapshot: snapshot };
   }
 
   // --- Participaciones ---

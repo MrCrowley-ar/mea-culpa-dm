@@ -41,6 +41,9 @@ export class Expedicion {
   @Column({ type: 'text', nullable: true })
   notas: string;
 
+  @Column({ type: 'jsonb', nullable: true, default: null })
+  estado_snapshot: Record<string, any> | null;
+
   @CreateDateColumn()
   created_at: Date;
 
