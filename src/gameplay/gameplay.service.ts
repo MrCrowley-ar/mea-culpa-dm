@@ -75,9 +75,9 @@ export class GameplayService {
     tiradaD20: number,
     tiradaSubtabla?: number,
   ): Promise<RecompensaResueltaDto> {
-    // 1. Obtener bonus del piso
+    // 1. Obtener bonus del piso (cap a 20)
     const bonusRecompensa = await this.configuracionService.getBonusRecompensa(piso);
-    const tiradaConBonus = tiradaD20 + bonusRecompensa;
+    const tiradaConBonus = Math.min(tiradaD20 + bonusRecompensa, 20);
 
     // 2. Buscar en tabla de recompensas
     const recompensa = await this.recompensasService.getRecompensaPorTirada(
