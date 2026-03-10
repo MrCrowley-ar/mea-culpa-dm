@@ -273,16 +273,18 @@ export class GameplayService {
     baseParams: any,
     descripcion?: string,
   ): Promise<RecompensaResueltaDto> {
-    const entrada = await this.recompensasService.getItemBossByTirada(piso, tirada);
+    // Boss usa 1d6 típicamente (5-6 items por piso), clampear si viene un valor mayor
+    const tiradaClamped = Math.max(1, Math.min(tirada, 6));
+    const entrada = await this.recompensasService.getItemBossByTirada(piso, tiradaClamped);
     if (!entrada) {
       throw new NotFoundServiceException(
-        `No se encontró item de boss para piso ${piso}, tirada ${tirada}`,
+        `No se encontró item de boss para piso ${piso}, tirada ${tiradaClamped} (original: ${tirada}, rango válido: 1-6)`,
       );
     }
     return RecompensaResueltaDto.subtablaResuelta({
       ...baseParams,
       subtabla_nombre: 'items_boss',
-      tirada_subtabla: tirada,
+      tirada_subtabla: tiradaClamped,
       item_nombre: entrada.item?.nombre,
       item_id: entrada.item_id,
       descripcion,
@@ -343,17 +345,19 @@ export class GameplayService {
     baseParams: any,
     descripcion?: string,
   ): Promise<RecompensaResueltaDto> {
-    let entrada = await this.recompensasService.getCriticoByTirada(tirada, piso);
+    // Crítico usa 1d4 (4 items por piso), clampear si viene un valor mayor
+    const tiradaClamped = Math.max(1, Math.min(tirada, 4));
+    let entrada = await this.recompensasService.getCriticoByTirada(tiradaClamped, piso);
     if (!entrada) {
-      entrada = await this.recompensasService.getCriticoByTirada(tirada);
+      entrada = await this.recompensasService.getCriticoByTirada(tiradaClamped);
     }
     if (!entrada) {
-      throw new NotFoundServiceException(`No se encontró crítico para tirada ${tirada}`);
+      throw new NotFoundServiceException(`No se encontró crítico para tirada ${tiradaClamped} (original: ${tirada}, rango válido: 1-4)`);
     }
     return RecompensaResueltaDto.subtablaResuelta({
       ...baseParams,
       subtabla_nombre: 'critico',
-      tirada_subtabla: tirada,
+      tirada_subtabla: tiradaClamped,
       item_nombre: entrada.item?.nombre,
       item_id: entrada.item_id,
       descripcion,
