@@ -9,6 +9,7 @@ export class RecompensaResueltaDto {
   descripcion?: string;
   requiere_subtabla: boolean;
   subtabla_nombre?: string;
+  dados_subtabla?: string;
   tirada_subtabla?: number;
   item_nombre?: string;
   item_id?: number;
@@ -65,6 +66,7 @@ export class RecompensaResueltaDto {
     bonus_recompensa: number;
     tirada_con_bonus: number;
     subtabla_nombre: string;
+    dados_subtabla?: string;
     descripcion?: string;
   }): RecompensaResueltaDto {
     const dto = new RecompensaResueltaDto();
@@ -75,6 +77,7 @@ export class RecompensaResueltaDto {
     dto.tirada_con_bonus = params.tirada_con_bonus;
     dto.tipo_resultado = 'subtabla';
     dto.subtabla_nombre = params.subtabla_nombre;
+    dto.dados_subtabla = params.dados_subtabla;
     dto.descripcion = params.descripcion;
     dto.requiere_subtabla = true;
     return dto;
@@ -87,6 +90,7 @@ export class RecompensaResueltaDto {
     bonus_recompensa: number;
     tirada_con_bonus: number;
     subtabla_nombre: string;
+    dados_subtabla?: string;
     tirada_subtabla: number;
     item_nombre?: string;
     item_id?: number;
@@ -102,6 +106,7 @@ export class RecompensaResueltaDto {
     dto.tirada_con_bonus = params.tirada_con_bonus;
     dto.tipo_resultado = 'subtabla';
     dto.subtabla_nombre = params.subtabla_nombre;
+    dto.dados_subtabla = params.dados_subtabla;
     dto.tirada_subtabla = params.tirada_subtabla;
     dto.requiere_subtabla = false;
     dto.item_nombre = params.item_nombre;

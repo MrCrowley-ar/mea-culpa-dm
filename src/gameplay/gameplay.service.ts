@@ -134,11 +134,14 @@ export class GameplayService {
       ? 'objetos_curiosos'
       : subtablaNombre;
 
+    const dadosSubtabla = this.getDadosSubtabla(subtablaNombrePublico);
+
     // Si no hay tirada de subtabla, indicar que se requiere
     if (tiradaSubtabla === undefined || tiradaSubtabla === null) {
       return RecompensaResueltaDto.subtablaPendiente({
         ...baseParams,
         subtabla_nombre: subtablaNombrePublico,
+        dados_subtabla: dadosSubtabla,
         descripcion: recompensa.descripcion,
       });
     }
@@ -152,6 +155,31 @@ export class GameplayService {
       baseParams,
       recompensa.descripcion,
     );
+  }
+
+  /**
+   * Retorna la expresión de dados para la subtabla (ej: "1d20", "1d6", "1d4").
+   */
+  private getDadosSubtabla(subtablaNombre: string): string {
+    switch (subtablaNombre.toLowerCase().trim()) {
+      case 'armas':
+        return '1d20';
+      case 'armaduras':
+        return '1d20';
+      case 'objetos_curiosos':
+      case 'botin_alternativo':
+        return '1d20';
+      case 'items_boss':
+        return '1d6';
+      case 'critico':
+        return '1d4';
+      case 'pociones':
+        return '1d20';
+      case 'tesoro_menor':
+        return '1d20';
+      default:
+        return '1d20';
+    }
   }
 
   private async resolverSubtabla(
@@ -212,6 +240,7 @@ export class GameplayService {
     return RecompensaResueltaDto.subtablaResuelta({
       ...baseParams,
       subtabla_nombre: 'armas',
+      dados_subtabla: '1d20',
       tirada_subtabla: tirada,
       item_nombre: entrada.item?.nombre,
       item_id: entrada.item_id,
@@ -234,6 +263,7 @@ export class GameplayService {
     return RecompensaResueltaDto.subtablaResuelta({
       ...baseParams,
       subtabla_nombre: 'armaduras',
+      dados_subtabla: '1d20',
       tirada_subtabla: tirada,
       item_nombre: entrada.item?.nombre,
       item_id: entrada.item_id,
@@ -260,6 +290,7 @@ export class GameplayService {
     return RecompensaResueltaDto.subtablaResuelta({
       ...baseParams,
       subtabla_nombre: 'objetos_curiosos',
+      dados_subtabla: '1d20',
       tirada_subtabla: tirada,
       item_nombre: entrada.item?.nombre,
       item_id: entrada.item_id,
@@ -284,6 +315,7 @@ export class GameplayService {
     return RecompensaResueltaDto.subtablaResuelta({
       ...baseParams,
       subtabla_nombre: 'items_boss',
+      dados_subtabla: '1d6',
       tirada_subtabla: tiradaClamped,
       item_nombre: entrada.item?.nombre,
       item_id: entrada.item_id,
@@ -308,6 +340,7 @@ export class GameplayService {
     return RecompensaResueltaDto.subtablaResuelta({
       ...baseParams,
       subtabla_nombre: 'pociones',
+      dados_subtabla: '1d20',
       tirada_subtabla: tirada,
       item_nombre: entrada.item?.nombre,
       item_id: entrada.item_id,
@@ -331,6 +364,7 @@ export class GameplayService {
     return RecompensaResueltaDto.subtablaResuelta({
       ...baseParams,
       subtabla_nombre: 'tesoro_menor',
+      dados_subtabla: '1d20',
       tirada_subtabla: tirada,
       item_nombre: entrada.item?.nombre,
       item_id: entrada.item_id,
@@ -357,6 +391,7 @@ export class GameplayService {
     return RecompensaResueltaDto.subtablaResuelta({
       ...baseParams,
       subtabla_nombre: 'critico',
+      dados_subtabla: '1d4',
       tirada_subtabla: tiradaClamped,
       item_nombre: entrada.item?.nombre,
       item_id: entrada.item_id,
