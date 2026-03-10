@@ -9,7 +9,7 @@ import { Piso } from './piso.entity';
 
 @Entity({ name: 'tiers', schema: 'expediciones' })
 @Check('"piso_min" <= "piso_max"')
-@Check('"numero" BETWEEN 1 AND 4')
+@Check('"numero" BETWEEN 1 AND 5')
 export class Tier {
   @PrimaryGeneratedColumn()
   id: number;

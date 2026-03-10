@@ -2,7 +2,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class SeedData1700000000001 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Seed tiers
+    // Seed tiers — NOTE: overridden by migration 1700000000010-RestructureTiersAndBonus
+    // which changes to 5 tiers (4 pisos each) with bonus pattern 0, +3, +4, +5
     await queryRunner.query(`
       INSERT INTO expediciones.tiers (numero, piso_min, piso_max, mod_armas, mod_armaduras, descripcion)
       VALUES
@@ -12,7 +13,7 @@ export class SeedData1700000000001 implements MigrationInterface {
         (4, 16, 20, 3, 3, 'Tier 4 - Pisos 16 a 20')
     `);
 
-    // Seed pisos with bonus_recompensa pattern: +0, +2, +4, +6, +8 per tier
+    // Seed pisos — NOTE: overridden by migration 1700000000010-RestructureTiersAndBonus
     await queryRunner.query(`
       INSERT INTO expediciones.pisos (numero, tier_id, bonus_recompensa, num_habitaciones_comunes)
       VALUES
